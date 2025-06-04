@@ -112,7 +112,16 @@ int main(){
 
     capsule.m = capsule.m - capsule.chute.m_parachute;
 
+    float Isp = 325; // s
+    float Tmax = 5000; // N
+    float theta_alt = 87*(PI/180); // radians. Maximum glide angle
+    float alpha = 1/(Isp*SEA_LEVEL_G);
+    Eigen::Matrix<float,6,1> x_lander_init;
+    x_lander_init << capsule.x_chute(1), capsule.x_chute(3), capsule.x_chute(5), -1*capsule.x_chute(0), capsule.x_chute(2), capsule.x_chute(4);
+
+    Lander lander(capsule.m, capsule.m_fuel, Isp, Tmax, theta_alt, alpha, x_lander_init);
     // Convex Optimization G-FOLD algorithm for powered descent
+
 
     ballistic_descent_file.close();
     chute_descent_file.close();
