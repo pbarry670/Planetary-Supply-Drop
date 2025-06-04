@@ -25,6 +25,7 @@ struct Parachute {
 struct Capsule {
     float m;
     float m_heatshield;
+    float m_fuel;
 
 
     float CD; // drag coefficient of capsule during descent
@@ -36,7 +37,7 @@ struct Capsule {
 
     Parachute chute;
 
-    Capsule(float m, float m_heatshield, float CD, float A, Parachute chute, Eigen::Vector3d x_ballistic);
+    Capsule(float m, float m_heatshield, float m_fuel, float CD, float A, Parachute chute, Eigen::Vector3d x_ballistic);
     void setBallisticState(float V, float gamma, float h);
     void setChuteState(float vx, float x, float vy, float y, float vz, float z);
 
@@ -52,6 +53,10 @@ struct Lander {
     float Tmax; // maximum thrust, N
     float theta_alt; // max angle with respect to vertical, deg
     float alpha; // fuel consumption parameter
+
+    Eigen::Matrix<float,6,1> x_lander;
+    
+    Lander(float m_wet, float m_fuel, float Isp, float Tmax, float theta_alt, float alpha, Eigen::Matrix<float,6,1> x_lander);
 
 };
 

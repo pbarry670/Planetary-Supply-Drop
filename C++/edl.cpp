@@ -8,9 +8,12 @@ using namespace std;
 Parachute::Parachute(float d, float CD, float m_parachute) : 
 d(d), CD(CD), m_parachute(m_parachute) { A = PI*(d/2)*(d/2); }
 
+Capsule::Capsule(float m, float m_heatshield, float m_fuel, float CD, float A, Parachute chute, Eigen::Vector3d x_ballistic) : 
+m(m), m_heatshield(m_heatshield), m_fuel(m_fuel), chute(chute), x_ballistic(x_ballistic) { beta = m/(CD*A); }
 
-Capsule::Capsule(float m, float m_heatshield, float CD, float A, Parachute chute, Eigen::Vector3d x_ballistic) : 
-m(m), m_heatshield(m_heatshield), chute(chute), x_ballistic(x_ballistic) { beta = m/(CD*A); }
+Lander::Lander(float m_wet, float m_fuel, float Isp, float Tmax, float theta_alt, float alpha, Eigen::Matrix<float,6,1> x_lander) :
+m_wet(m_wet), m_fuel(m_fuel), Isp(Isp), Tmax(Tmax), theta_alt(theta_alt), alpha(alpha), x_lander(x_lander) { Tmin = 0.3*Tmax; }
+
 
 void Capsule::setBallisticState(float V, float gamma, float h) {
         Capsule::x_ballistic(0) = V;
@@ -78,7 +81,7 @@ Eigen::Vector3d propagateBallistic(Capsule capsule){
     //Eigen::Vector3d k3 = ballisticDynamics(capsule, capsule.x_ballistic + k2*(EDL_DT/2));
     //Eigen::Vector3d k4 = ballisticDynamics(capsule, capsule.x_ballistic + k3*EDL_DT);
     //Eigen::Vector3d x_next = capsule.x_ballistic + EDL_DT*((1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4);
-    
+
     Eigen::Vector3d x_dot = ballisticDynamics(capsule, capsule.x_ballistic);
     Eigen::Vector3d x_next = capsule.x_ballistic + EDL_DT*x_dot;
 
@@ -93,12 +96,15 @@ Eigen::Vector3d propagateBallistic(Capsule capsule){
 
 Eigen::Matrix<float,6,1> propagateChute(Capsule capsule, float vy_perturb, float vz_perturb){
 
-    Eigen::Matrix<float,6,1> k1 = chuteDynamics(capsule, capsule.x_chute, vy_perturb, vz_perturb);
-    Eigen::Matrix<float,6,1> k2 = chuteDynamics(capsule, capsule.x_chute + k1*(EDL_DT/2), vy_perturb, vz_perturb);
-    Eigen::Matrix<float,6,1> k3 = chuteDynamics(capsule, capsule.x_chute + k2*(EDL_DT/2), vy_perturb, vz_perturb);
-    Eigen::Matrix<float,6,1> k4 = chuteDynamics(capsule, capsule.x_chute + k3*EDL_DT, vy_perturb, vz_perturb);
+    //Eigen::Matrix<float,6,1> k1 = chuteDynamics(capsule, capsule.x_chute, vy_perturb, vz_perturb);
+    //Eigen::Matrix<float,6,1> k2 = chuteDynamics(capsule, capsule.x_chute + k1*(EDL_DT/2), vy_perturb, vz_perturb);
+    //Eigen::Matrix<float,6,1> k3 = chuteDynamics(capsule, capsule.x_chute + k2*(EDL_DT/2), vy_perturb, vz_perturb);
+    //Eigen::Matrix<float,6,1> k4 = chuteDynamics(capsule, capsule.x_chute + k3*EDL_DT, vy_perturb, vz_perturb);
+    //Eigen::Matrix<float,6,1> x_next = capsule.x_chute + EDL_DT*((1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4);
 
-    Eigen::Matrix<float,6,1> x_next = capsule.x_chute + EDL_DT*((1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4);
+    Eigen::Matrix<float,6,1> x_dot = chuteDynamics(capsule, capsule.x_chute, vy_perturb, vz_perturb);
+    Eigen::Matrix<float,6,1> x_next = capsule.x_chute + EDL_DT*x_dot;
+
     return x_next;
 }
 
