@@ -108,10 +108,9 @@ Eigen::Matrix<float,6,1> propagateActualSatellite(ActualSatellite sat, Eigen::Ma
 Eigen::Matrix<float,6,1> propagateReferenceSatellite(ReferenceSatellite sat, Eigen::Matrix<float,6,1> x);
 Eigen::Matrix<float,6,1> propagateEarthState(Eigen::Matrix<float,6,1> x);
 
-Eigen::Matrix<float,6,1> elements2RV(float a, float e, float i, float O, float W, float f);
+Eigen::Matrix<float,6,1> elements2RV(float a, float e, float i, float O, float w, float f);
 Eigen::Matrix<float,5,1> RV2elements(Eigen::Matrix<float,6,1> x);
 
-Eigen::Matrix<float,3,3> computeR_LVLH_2_ECI(float i, float O, float T);
 Eigen::Matrix<float,3,3> computeR_ECI_2_LVLH(float i, float O, float T);
 Eigen::Matrix<float,3,3> computeR_ECEF_2_ECI(float alpha);
 Eigen::Matrix<float,3,3> computeR_ECI_2_ECEF(float alpha);

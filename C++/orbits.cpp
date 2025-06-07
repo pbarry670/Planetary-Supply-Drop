@@ -145,3 +145,191 @@ Eigen::Matrix<float,6,1> earthOrbitDynamics(Eigen::Matrix<float,6,1> x) {
     return xdot;
 
 }
+
+Eigen::Matrix<float,6,1> propagateActualSatellite(ActualSatellite sat, Eigen::Matrix<float,6,1> x, Eigen::Vector3d u, Eigen::Vector3d r_S2E) {
+
+    Eigen::Matrix<float,6,1> k1 = satelliteActualOrbitDynamics(sat, x, u, r_S2E);
+    Eigen::Matrix<float,6,1> k2 = satelliteActualOrbitDynamics(sat, x + k1*(ORBIT_DT/2), u, r_S2E);
+    Eigen::Matrix<float,6,1> k3 = satelliteActualOrbitDynamics(sat, x + k2*(ORBIT_DT/2), u, r_S2E);
+    Eigen::Matrix<float,6,1> k4 = satelliteActualOrbitDynamics(sat, x + k3*ORBIT_DT, u, r_S2E);
+
+    Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*( (1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4 );
+    return x_next;
+
+}
+
+Eigen::Matrix<float,6,1> propagateReferenceSatellite(ReferenceSatellite sat, Eigen::Matrix<float,6,1> x) {
+
+    Eigen::Matrix<float,6,1> k1 = satelliteReferenceOrbitDynamics(sat, x);
+    Eigen::Matrix<float,6,1> k2 = satelliteReferenceOrbitDynamics(sat, x + k1*(ORBIT_DT/2));
+    Eigen::Matrix<float,6,1> k3 = satelliteReferenceOrbitDynamics(sat, x + k2*(ORBIT_DT/2));
+    Eigen::Matrix<float,6,1> k4 = satelliteReferenceOrbitDynamics(sat, x + k3*ORBIT_DT);
+
+    Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*( (1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4 );
+    return x_next;
+}
+
+Eigen::Matrix<float,6,1> propagateEarthState(Eigen::Matrix<float,6,1> x) {
+
+    Eigen::Matrix<float,6,1> k1 = earthOrbitDynamics(x);
+    Eigen::Matrix<float,6,1> k2 = earthOrbitDynamics(x + k1*(ORBIT_DT/2));
+    Eigen::Matrix<float,6,1> k3 = earthOrbitDynamics(x + k2*(ORBIT_DT/2));
+    Eigen::Matrix<float,6,1> k4 = earthOrbitDynamics(x + k3*ORBIT_DT);
+
+    Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*( (1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4 );
+    return x_next;
+
+}
+
+
+Eigen::Matrix<float,6,1> elements2RV(float a, float e, float i, float O, float w, float f) {
+
+    float rNorm = (a*(1 - pow(e,2)))/(1 + e*cos(f));
+    Eigen::Vector3d rPeri;
+    rPeri << rNorm*cos(f), rNorm*sin(f), 0;
+
+    float p = a*(1 - pow(e,2));
+    Eigen::Vector3d vPeri;
+    vPeri << sqrt(MU_E/p)*-1*sin(f), sqrt(MU_E/p)*(e+cos(f)); 0;
+
+    Eigen::Matrix<float,3,3> R; // rotation matrix from perifocal frame to ECI frame
+
+    R(0,0) = cos(O)*cos(w) - sin(O)*sin(w)*cos(i);
+    R(0,1) = -cos(O)*sin(w) - sin(O)*cos(w)*cos(i);
+    R(0,2) = sin(O)*sin(i);
+
+    R(1,0) = sin(O)*cos(w) + cos(O)*sin(w)*cos(i);
+    R(1,1) = -sin(O)*sin(w) + cos(O)*cos(w)*cos(i);
+    R(1,2) = -cos(O)*sin(i);
+
+    R(2,0) = sin(w)*sin(i);
+    R(2,1) = cos(w)*sin(i);
+    R(2,2) = cos(i);
+
+    Eigen::Vector3d r = R*rPeri;
+    Eigen::Vector3d v = R*vPeri;
+
+    Eigen::Matrix<float,6,1> x;
+    x << r(0), r(1), r(2), v(0), v(1), v(2);
+    return x;
+
+}
+
+Eigen::Matrix<float,5,1> RV2elements(Eigen::Matrix<float,6,1> x) {
+
+    // Returns elements a, e, i, O, w, and T=Theta. Theta is w+f because this package deals with circular orbits.
+
+    Eigen::Vector3d r;
+    r << x(0), x(1), x(2);
+    Eigen::Vector3d v;
+    Eigen::Vector3d h = r.cross(v);
+
+    float eps = pow(v.norm(), 2)/2 - MU_E/r.norm();
+
+    float a = -MU_E/(2*eps);
+    float e;
+    if (1 + 2*eps*h.norm()*h.norm()/(pow(MU_E,2)) <= 0) {
+        e = 0.00001;
+    } else {
+        e = sqrt(1 + 2*eps*h.norm()*h.norm()/(pow(MU_E,2)));
+    }
+
+    float p = pow(h.norm(), 2)/MU_E;
+
+    float cosI = h(2)/h.norm();
+    float i = acos(cosI);
+
+    float O;
+    if (h(1) == 0 && h(0) == 0) {
+        O = 0;
+    } else {
+        float hxy = sqrt(pow(h(0), 2) + pow(h(1), 2));
+        float sinO = h(0)/hxy;
+        float cosO = -h(1)/hxy;
+        O = atan2(sinO, cosO);
+    }
+
+    float T;
+    Eigen::Vector3d n;
+    n << cos(O), sin(O), 0;
+    float cosT = n.dot(r)/r.norm();
+    T = acos(cosT);
+    if (r.dot(v) < 0) {
+        T = 2*PI - T;
+    }
+
+    Eigen::Matrix<float,5,1> elems;
+    elems << a, e, i, O, T;
+    return elems;
+
+}
+
+Eigen::Matrix<float,3,3> computeR_ECI_2_LVLH(float i, float O, float T) {
+
+    Eigen::Matrix<float,3,3> R;
+    R(0,0) = cos(O)*cos(T) - sin(O)*sin(T)*cos(i);
+    R(0,1) = sin(O)*cos(T) + cos(O)*sin(T)*cos(i);
+    R(0,2) = sin(T)*sin(i);
+    R(1,0) = -cos(O)*sin(T) - sin(O)*cos(T)*cos(i);
+    R(1,1) = -sin(O)*sin(T) + cos(O)*cos(T)*cos(i);
+    R(1,2) = cos(T)*sin(i);
+    R(2,0) = sin(O)*sin(i);
+    R(2,1) = -cos(O)*sin(i);
+    R(2,2) = cos(i);
+
+    return R;
+
+}
+
+Eigen::Matrix<float,3,3> computeR_ECEF_2_ECI(float alpha) {
+
+    Eigen::Matrix<float,3,3> R;
+    R << cos(alpha), -sin(alpha), 0,
+         sin(alpha), cos(alpha), 0,
+         0, 0, 1;
+
+    return R;
+
+}
+
+Eigen::Matrix<float,3,3> computeR_ECI_2_ECEF(float alpha) {
+
+    Eigen::Matrix<float,3,3> R;
+    R << cos(alpha), sin(alpha), 0,
+         sin(alpha), cos(alpha), 0,
+         0, 0, 1;
+
+}
+
+Eigen::Vector3d ECEF2LLA(Eigen::Matrix<float,6,1> x_ECEF) {
+
+    Eigen::Vector3d x_LLA;
+    Eigen::Vector3d r_ECEF;
+    r_ECEF << x_ECEF(0), x_ECEF(1), x_ECEF(2);
+
+    float lat = asin(r_ECEF(2)/r_ECEF.norm());
+
+    float cosLon = r_ECEF(0)/(cos(lat)*r_ECEF.norm());
+    float sinLon = r_ECEF(1)/(cos(lat)*r_ECEF.norm());
+
+    float lon = atan2(sinLon, cosLon);
+
+    float alt = r_ECEF.norm() - R_EARTH;
+
+    x_LLA << lat, lon, alt;
+    return x_LLA;
+
+}
+
+Eigen::Vector3d LLA2ECEF(Eigen::Vector3d x_LLA) {
+
+    Eigen::Vector3d r_ECEF;
+
+    float x = (R_EARTH + x_LLA(2))*cos(x_LLA(0))*cos(x_LLA(1));
+    float y = (R_EARTH + x_LLA(2))*cos(x_LLA(0))*sin(x_LLA(1));
+    float z = (R_EARTH + x_LLA(2))*sin(x_LLA(0));
+
+    r_ECEF << x, y, z;
+    return r_ECEF;
+
+}
