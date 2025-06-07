@@ -9,23 +9,32 @@ const float R_EARTH = 6378000; // m
 const float ORB_ALT = 500000; // m
 const float PI = 3.14159;
 const float W_E = (2*PI)/86164; // rad/s
-const float MU_E = 3.986e14; // m^3/s^2
-const float MU_S = 1.327e20; // m^3/s^2
+const float MU_E = 3.986*pow(10,14); // m^3/s^2
+const float MU_S = 1.327*pow(10,20); // m^3/s^2
 const float R_ORBIT = R_EARTH + ORB_ALT;
 const float SPEED_ORBIT = sqrt(MU_E/R_ORBIT); // m/s
 const float T_ORBIT =  2*PI*sqrt(pow(R_ORBIT,3)/MU_E); // s
-const float ALPHA_0 = 0; // rad
 const float ORBIT_DT = 1; // s
+
+const float J2 = 0.0010827; // J2 constant
+const float P_SMF = 4.56*pow(10,-6); // solar momentum flux, N/m^2
+const float CR = 1; // reflectivity coefficient
 
 struct ActualSatellite {
 
     float m;
+    float CD;
+    float A;
+
     Eigen::Matrix<float,6,1> x_ECI;
     Eigen::Matrix<float,6,1> x_ECEF;
     Eigen::Matrix<float,6,1> x_LVLH;
     Eigen::Vector3d x_LLA;
+
     Eigen::Vector3d u_ECI;
     Eigen::Vector3d u_LVLH;
+
+    ActualSatellite(float m, float CD, float A, Eigen::Matrix<float,6,1> x_ECI);
 
 };
 
@@ -37,13 +46,17 @@ struct ReferenceSatellite {
     Eigen::Matrix<float,6,1> x_LVLH;
     Eigen::Vector3d x_LLA;
 
+    ReferenceSatellite(float m, Eigen::Matrix<float,6,1> x_ECI);
+
 
 };
 
-struct EarthOrbit {
+struct Earth {
 
     Eigen::Matrix<float,6,1> x;
-    Eigen::Matrix<float,6,1> orb_elems;
+    Eigen::Vector3d r_S2E;
+
+    Earth(Eigen::Matrix<float,6,1> x);
 
 };
 
@@ -79,9 +92,10 @@ struct OrbitParams {
     float DTheta;
     float DThetaTolerance;
     float timeToDropFromFinalPass;
-    float timeToLand;
 
-    bool hasDeployed;
+    bool hasDeployed = false;
+
+    OrbitParams(float alpha0, Eigen::Matrix<float,3,6> K, Eigen::Vector3d ddl, float DTheta, float DThetaTolerance, float ttdffp, float latTol, float lonTol);
 
 
 };
