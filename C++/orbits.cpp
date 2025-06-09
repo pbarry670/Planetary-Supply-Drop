@@ -7,13 +7,13 @@ using namespace std;
 ActualSatellite::ActualSatellite(float m, float CD, float A, Eigen::Matrix<float,6,1> x_ECI) :
 m(m), CD(CD), A(A), x_ECI(x_ECI) { 
     u_ECI << 0,0,0; 
-    // Parameters not set after constructor: x_ECEF, x_LVLH, x_LLA, u_LVLH
+    u_LVLH << 0,0,0;
+    x_LVLH << 0,0,0,0,0,0;
+    // Parameters not set after constructor: x_ECEF, x_LLA
 }
 
 ReferenceSatellite::ReferenceSatellite(float m, Eigen::Matrix<float,6,1> x_ECI) :
-m(m), x_ECI(x_ECI) {
-    // Parameters not set after constructor: x_ECEF, x_LVLH, x_LLA
-}
+m(m), x_ECI(x_ECI) {}
 
 Earth::Earth(Eigen::Matrix<float,6,1> x) : x(x) {
     r_S2E(0) = x(0);

@@ -15,6 +15,7 @@ const float R_ORBIT = R_EARTH + ORB_ALT;
 const float SPEED_ORBIT = sqrt(MU_E/R_ORBIT); // m/s
 const float T_ORBIT =  2*PI*sqrt(pow(R_ORBIT,3)/MU_E); // s
 const float ORBIT_DT = 1; // s
+const int NUM_ORBITS_BEFORE_INCL_CHANGE = 2;
 
 const float J2 = 0.0010827; // J2 constant
 const float P_SMF = 4.56*pow(10,-6); // solar momentum flux, N/m^2
@@ -42,9 +43,6 @@ struct ReferenceSatellite {
 
     float m;
     Eigen::Matrix<float,6,1> x_ECI;
-    Eigen::Matrix<float,6,1> x_ECEF;
-    Eigen::Matrix<float,6,1> x_LVLH;
-    Eigen::Vector3d x_LLA;
 
     ReferenceSatellite(float m, Eigen::Matrix<float,6,1> x_ECI);
 
