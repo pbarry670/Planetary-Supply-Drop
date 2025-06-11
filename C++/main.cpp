@@ -98,6 +98,7 @@ int main(){
     float latTol = 0.01*(PI/180); // rad. Denotes the tolerance of determining when the satellite is considered to be passing over the latitude of the target location
     float lonTol = 0.05*(PI/180); // rad. Denotes the tolerance of the +/- of longitude error when satellite is passing over target location
     float DThetaTol = 0.05*(PI/180); // rad. Denotes the tolerance of when the satellite is DTheta phase angle from the desired drop point in the orbital plane.
+    float timeToDropFromFinalPass = ((2*PI-total_dtheta)/(2*PI))*T_ORBIT;
 
     float alpha0 = 0; // rad. Denotes the angle between the ECI and ECEF frames at start of orbit propagation
     
@@ -106,7 +107,7 @@ int main(){
          0.1525, 3.1586, 0, 0.0058, 137.6687, 0,
          0, 0, 3.1586, 0, 0, 137.6685; // gain matrix for orbit LQR control (constraining actual orbit to reference orbit)
          // The above was derived using the CW frame dynamics and MATLAB's lqr()
-    OrbitParams orbitParams(alpha0, K, desiredDropLocation, total_dtheta, DThetaTol, bd_time, latTol, lonTol);
+    OrbitParams orbitParams(alpha0, K, desiredDropLocation, total_dtheta, DThetaTol, timeToDropFromFinalPass, latTol, lonTol);
 
     orbitParams.R_ECI_2_LVLH = computeR_ECI_2_LVLH(i0_Sat, O0_Sat, w0_Sat);
     orbitParams.R_LVLH_2_ECI = orbitParams.R_ECI_2_LVLH.transpose();
@@ -208,12 +209,91 @@ int main(){
     // Continue propagating the orbit that passes over the drop point at its zenith until the capsule drops
     while (!orbitParams.hasDeployed) {
 
+        globalTime = globalTime + ORBIT_DT;
+        orbitParams.alpha = W_E*globalTime + orbitParams.alpha0;
 
+        Eigen::Matrix<float,6,1> xSatNext = propagateActualSatellite(sat, sat.x_ECI, sat.u_ECI, earth.r_S2E);
+        Eigen::Matrix<float,6,1> xRefSatNext = propagateReferenceSatellite(refSat, refSat.x_ECI);
+        Eigen::Matrix<float,6,1> xEarthNext = propagateEarthState(earth.x);
+        sat.x_ECI = xSatNext;
+        refSat.x_ECI = xRefSatNext;
+        earth.x = xEarthNext;
+        earth.r_S2E = xEarthNext(Eigen::seq(0,2));
 
+        Eigen::Matrix<float,5,1> orbElems = RV2elements(refSat.x_ECI);
+        orbitParams.R_ECI_2_LVLH = computeR_ECI_2_LVLH(orbElems(2), orbElems(3), orbElems(4));
+        Eigen::Matrix<float,6,1> dx_ECI = sat.x_ECI - refSat.x_ECI;
+        Eigen::Vector3d r_LVLH = orbitParams.R_ECI_2_LVLH*dx_ECI(Eigen::seq(0,2));
+        Eigen::Vector3d v_LVLH = orbitParams.R_ECI_2_LVLH*dx_ECI(Eigen::seq(3,5));
+        Eigen::Matrix<float,6,1> state_LVLH;
+        state_LVLH << r_LVLH(0), r_LVLH(1), r_LVLH(2), v_LVLH(0), v_LVLH(1), v_LVLH(2);
+        sat.x_LVLH = state_LVLH;
+        sat.u_LVLH = -K*sat.x_LVLH;
 
+        orbitParams.R_LVLH_2_ECI = orbitParams.R_ECI_2_LVLH.transpose();
+        sat.u_ECI = orbitParams.R_LVLH_2_ECI*sat.u_LVLH;
 
+        orbitParams.R_ECI_2_ECEF = computeR_ECI_2_ECEF(orbitParams.alpha);
+        Eigen::Vector3d r_ECEF = orbitParams.R_ECI_2_ECEF*sat.x_ECI(Eigen::seq(0,2));
+        Eigen::Vector3d v_ECEF = orbitParams.R_ECI_2_ECEF*sat.x_ECI(Eigen::seq(3,5));
+        Eigen::Matrix<float,6,1> state_ECEF;
+        state_ECEF << r_ECEF(0), r_ECEF(1), r_ECEF(2), v_ECEF(0), v_ECEF(1), v_ECEF(2);
+        sat.x_ECEF = state_ECEF;
+
+        sat.x_LLA = ECEF2LLA(sat.x_ECEF);
+
+        orbits_file << globalTime << ","
+                << earth.x(0) << "," << earth.x(1) << "," << earth.x(2) << "," << earth.x(3) << "," << earth.x(4) << "," << earth.x(5) << ","
+                << sat.x_ECI(0) << "," << sat.x_ECI(1) << "," << sat.x_ECI(2) << "," << sat.x_ECI(3) << "," << sat.x_ECI(4) << "," << sat.x_ECI(5) << ","
+                << refSat.x_ECI(0) << "," << refSat.x_ECI(1) << "," << refSat.x_ECI(2) << "," << refSat.x_ECI(3) << "," << refSat.x_ECI(4) << "," << refSat.x_ECI(5) << ","
+                << sat.u_ECI(0) << "," << sat.u_ECI(1) << "," << sat.u_ECI(2) << ","
+                << sat.u_LVLH(0) << "," << sat.u_LVLH(1) << "," << sat.u_LVLH(2) << ","
+                << sat.x_LVLH(0) << "," << sat.x_LVLH(1) << "," << sat.x_LVLH(2) << "," << sat.x_LVLH(3) << "," << sat.x_LVLH(4) << "," << sat.x_LVLH(5) << ","
+                << sat.x_LLA(0) << "," << sat.x_LLA(1) << "," << sat.x_LLA(2) << ","
+                << orbitParams.alpha
+                << "\n";
+
+        // Log time of passage over desired drop point latitude and mark down longitudes at each
+        if (abs(orbitParams.desiredDropLocation(0) - sat.x_LLA(0)) <= orbitParams.latTolerance) {
+            if (!orbitParams.hasOrbitedOnce) {
+                orbitParams.lonAtDesiredLatFirst = sat.x_LLA(1);
+                orbitParams.hasOrbitedOnce = true;
+                orbitParams.timeOfFirstPass = globalTime;
+            } else if (!orbitParams.hasOrbitedTwice && ((globalTime - orbitParams.timeOfFirstPass) >= 0.5*T_ORBIT)) {
+                orbitParams.lonAtDesiredLatSecond = sat.x_LLA(1);
+                orbitParams.hasOrbitedTwice = true;
+                orbitParams.timeOfSecondPass = globalTime;
+            }
+        }
+
+        if (orbitParams.hasOrbitedOnce && orbitParams.hasOrbitedTwice && !orbitParams.phaseShiftDetermined) {
+            orbitParams.lonPhaseShiftPerOrbit = orbitParams.lonAtDesiredLatSecond - orbitParams.lonAtDesiredLatFirst;
+            orbitParams.phaseShiftDetermined = true;
+        }
+
+        if (orbitParams.phaseShiftDetermined && abs(orbitParams.desiredDropLocation(0) - sat.x_LLA(0))) {
+            if (abs(sat.x_LLA(1) + orbitParams.lonPhaseShiftPerOrbit) <= orbitParams.lonTolerance) {
+                orbitParams.readyToDrop = true;
+                orbitParams.timeOfFinalPass = globalTime;
+            }
+        }
+
+        if (orbitParams.readyToDrop && (globalTime - orbitParams.timeOfFinalPass >= orbitParams.timeToDropFromFinalPass) && !orbitParams.hasDeployed) {
+            orbitParams.hasDeployed = true;
+            Eigen::Vector3d r_DropPointECI = sat.x_ECI(Eigen::seq(0,2));
+            orbitParams.timeOfDeployment = globalTime;
+        }
+
+        if (orbitParams.hasDeployed && (globalTime >= orbitParams.timeOfDeployment+bd_time) && !orbitParams.targetLocAtChuteDeployLogged) {
+            Eigen::Vector3d r_targetECEF = LLA2ECEF(orbitParams.desiredDropLocation);
+            orbitParams.R_ECEF_2_ECI = computeR_ECEF_2_ECI(orbitParams.alpha);
+            Eigen::Vector3d r_targetECI = orbitParams.R_ECEF_2_ECI*r_targetECEF;
+            orbitParams.targetLocAtChuteDeployLogged = true;
+        }
 
     }
+
+    // Log one-time variables of interest to a file.
 
 
 

@@ -91,6 +91,9 @@ struct OrbitParams {
     float DThetaTolerance;
     float timeToDropFromFinalPass;
 
+    float timeOfDeployment;
+    bool targetLocAtChuteDeployLogged = false;
+
     bool hasDeployed = false;
 
     OrbitParams(float alpha0, Eigen::Matrix<float,3,6> K, Eigen::Vector3d ddl, float DTheta, float DThetaTolerance, float ttdffp, float latTol, float lonTol);

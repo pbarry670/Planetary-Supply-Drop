@@ -46,7 +46,7 @@ alpha0(alpha0), K(K), desiredDropLocation(ddl), DTheta(DTheta), DThetaTolerance(
                     0, 1, 0,
                     0, 0, 1;
 
-    // Parameters not set after constructor: lonAtDesiredLatFirst; lonPhaseShiftPerOrbit, timeOfFirstPass, timeOfSecondPass, timeOfFinalPass
+    // Parameters not set after constructor: lonAtDesiredLatFirst; lonPhaseShiftPerOrbit, timeOfFirstPass, timeOfSecondPass, timeOfFinalPass, timeOfDeployment
 
 }
 
