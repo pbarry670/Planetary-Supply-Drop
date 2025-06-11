@@ -181,7 +181,42 @@ int main(){
 
     // Now, compute and execute the Delta-V necessary for the satellite to reach a desired orbit necessary to pass over the drop point.
 
+    float iDesired = orbitParams.desiredDropLocation(0);
     
+    // Find Delta-V for actual satellite
+    Eigen::Vector3d vCurrentAct = sat.x_ECI(Eigen::seq(3,5));
+    Eigen::Matrix<float,5,1> orbElemsAct = RV2elements(sat.x_ECI);
+    Eigen::Matrix<float,6,1> xDesiredAct = elements2RV(orbElemsAct(0), orbElemsAct(1), iDesired, orbElemsAct(3), orbElemsAct(4), 0);
+    Eigen::Vector3d vDesiredAct = xDesiredAct(Eigen::seq(3,5));
+    Eigen::Vector3d DeltaVAct = vDesiredAct - vCurrentAct;
+
+    // Find Delta-V for reference satellite
+    Eigen::Vector3d vCurrentRef = refSat.x_ECI(Eigen::seq(3,5));
+    Eigen::Matrix<float,5,1> orbElemsRef = RV2elements(refSat.x_ECI);
+    Eigen::Matrix<float,6,1> xDesiredRef = elements2RV(orbElemsAct(0), orbElemsAct(1), iDesired, orbElemsAct(3), orbElemsAct(4), 0);
+    Eigen::Vector3d vDesiredRef = xDesiredRef(Eigen::seq(3,5));
+    Eigen::Vector3d DeltaVRef = vDesiredRef - vCurrentRef;
+
+    // Apply Delta-V
+    sat.x_ECI(3) = sat.x_ECI(3) + DeltaVAct(0);
+    sat.x_ECI(4) = sat.x_ECI(4) + DeltaVAct(1);
+    sat.x_ECI(5) = sat.x_ECI(5) + DeltaVAct(2);
+    refSat.x_ECI(3) = refSat.x_ECI(3) + DeltaVRef(0);
+    refSat.x_ECI(4) = refSat.x_ECI(4) + DeltaVRef(1);
+    refSat.x_ECI(5) = refSat.x_ECI(5) + DeltaVRef(2);
+
+    // Continue propagating the orbit that passes over the drop point at its zenith until the capsule drops
+    while (!orbitParams.hasDeployed) {
+
+
+
+
+
+
+    }
+
+
+
 
     orbits_file.close();
 }

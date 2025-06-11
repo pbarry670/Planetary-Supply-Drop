@@ -64,7 +64,7 @@ struct OrbitParams {
     float alpha;
 
     Eigen::Matrix<float,3,6> K;
-    Eigen::Vector3d desired_drop_location;
+    Eigen::Vector3d desiredDropLocation;
 
     Eigen::Matrix<float,3,3> R_LVLH_2_ECI;
     Eigen::Matrix<float,3,3> R_ECI_2_LVLH;

@@ -22,7 +22,7 @@ Earth::Earth(Eigen::Matrix<float,6,1> x) : x(x) {
 }
 
 OrbitParams::OrbitParams(float alpha0, Eigen::Matrix<float,3,6> K, Eigen::Vector3d ddl, float DTheta, float DThetaTolerance, float ttdffp, float latTol, float lonTol) :
-alpha0(alpha0), K(K), desired_drop_location(ddl), DTheta(DTheta), DThetaTolerance(DThetaTolerance), timeToDropFromFinalPass(ttdffp), latTolerance(latTol), lonTolerance(lonTol) {
+alpha0(alpha0), K(K), desiredDropLocation(ddl), DTheta(DTheta), DThetaTolerance(DThetaTolerance), timeToDropFromFinalPass(ttdffp), latTolerance(latTol), lonTolerance(lonTol) {
     alpha = alpha0;
 
     Eigen::Matrix<float,3,3> R_LVLH_2_ECI;
