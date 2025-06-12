@@ -49,10 +49,11 @@ int main(){
                             << "\n";
 
     while (capsule.x_ballistic(2) >= h_chute_deploy) { // propagate ballistic dynamics and count dtheta for orbit optimization
+        bd_time = bd_time + EDL_DT;
+        
         total_dtheta = total_dtheta + (capsule.x_ballistic(0)*cos(capsule.x_ballistic(1))*EDL_DT)/(R_EARTH + capsule.x_ballistic(2));
         x_ballistic_next = propagateBallistic(capsule);
         capsule.x_ballistic = x_ballistic_next;
-        bd_time = bd_time + EDL_DT;
 
         ballistic_descent_info_file << bd_time << ","
                                << capsule.x_ballistic(0) << ","
@@ -114,11 +115,15 @@ int main(){
     orbitParams.R_ECI_2_ECEF = computeR_ECI_2_ECEF(orbitParams.alpha);
     orbitParams.R_ECEF_2_ECI = computeR_ECEF_2_ECI(orbitParams.alpha);
 
-    // Open up orbital data logging
-    std::ofstream orbits_file;
-    orbits_file.open("orbs.csv");
+    float timeAtChuteDeployment;
+    Eigen::Vector3d r_targetECI;
+    Eigen::Vector3d r_DropPointECI;
 
-    orbits_file << globalTime << ","
+    // Open up orbital data logging
+    std::ofstream orbitsFile;
+    orbitsFile.open("orbs.csv");
+
+    orbitsFile << globalTime << ","
                 << earth.x(0) << "," << earth.x(1) << "," << earth.x(2) << "," << earth.x(3) << "," << earth.x(4) << "," << earth.x(5) << ","
                 << sat.x_ECI(0) << "," << sat.x_ECI(1) << "," << sat.x_ECI(2) << "," << sat.x_ECI(3) << "," << sat.x_ECI(4) << "," << sat.x_ECI(5) << ","
                 << refSat.x_ECI(0) << "," << refSat.x_ECI(1) << "," << refSat.x_ECI(2) << "," << refSat.x_ECI(3) << "," << refSat.x_ECI(4) << "," << refSat.x_ECI(5) << ","
@@ -168,7 +173,7 @@ int main(){
 
         sat.x_LLA = ECEF2LLA(sat.x_ECEF);
 
-        orbits_file << globalTime << ","
+        orbitsFile << globalTime << ","
                 << earth.x(0) << "," << earth.x(1) << "," << earth.x(2) << "," << earth.x(3) << "," << earth.x(4) << "," << earth.x(5) << ","
                 << sat.x_ECI(0) << "," << sat.x_ECI(1) << "," << sat.x_ECI(2) << "," << sat.x_ECI(3) << "," << sat.x_ECI(4) << "," << sat.x_ECI(5) << ","
                 << refSat.x_ECI(0) << "," << refSat.x_ECI(1) << "," << refSat.x_ECI(2) << "," << refSat.x_ECI(3) << "," << refSat.x_ECI(4) << "," << refSat.x_ECI(5) << ","
@@ -242,7 +247,7 @@ int main(){
 
         sat.x_LLA = ECEF2LLA(sat.x_ECEF);
 
-        orbits_file << globalTime << ","
+        orbitsFile << globalTime << ","
                 << earth.x(0) << "," << earth.x(1) << "," << earth.x(2) << "," << earth.x(3) << "," << earth.x(4) << "," << earth.x(5) << ","
                 << sat.x_ECI(0) << "," << sat.x_ECI(1) << "," << sat.x_ECI(2) << "," << sat.x_ECI(3) << "," << sat.x_ECI(4) << "," << sat.x_ECI(5) << ","
                 << refSat.x_ECI(0) << "," << refSat.x_ECI(1) << "," << refSat.x_ECI(2) << "," << refSat.x_ECI(3) << "," << refSat.x_ECI(4) << "," << refSat.x_ECI(5) << ","
@@ -266,11 +271,13 @@ int main(){
             }
         }
 
+        // Determine how much the longitude shifts each time the satellite passes over the desired latitude
         if (orbitParams.hasOrbitedOnce && orbitParams.hasOrbitedTwice && !orbitParams.phaseShiftDetermined) {
             orbitParams.lonPhaseShiftPerOrbit = orbitParams.lonAtDesiredLatSecond - orbitParams.lonAtDesiredLatFirst;
             orbitParams.phaseShiftDetermined = true;
         }
 
+        // If satellite is one orbits' longitudinal phase shift away from passing over desired point, mark it as ready to drop on next orbit
         if (orbitParams.phaseShiftDetermined && abs(orbitParams.desiredDropLocation(0) - sat.x_LLA(0))) {
             if (abs(sat.x_LLA(1) + orbitParams.lonPhaseShiftPerOrbit) <= orbitParams.lonTolerance) {
                 orbitParams.readyToDrop = true;
@@ -280,84 +287,74 @@ int main(){
 
         if (orbitParams.readyToDrop && (globalTime - orbitParams.timeOfFinalPass >= orbitParams.timeToDropFromFinalPass) && !orbitParams.hasDeployed) {
             orbitParams.hasDeployed = true;
-            Eigen::Vector3d r_DropPointECI = sat.x_ECI(Eigen::seq(0,2));
+            r_DropPointECI = sat.x_ECI(Eigen::seq(0,2));
             orbitParams.timeOfDeployment = globalTime;
         }
 
         if (orbitParams.hasDeployed && (globalTime >= orbitParams.timeOfDeployment+bd_time) && !orbitParams.targetLocAtChuteDeployLogged) {
             Eigen::Vector3d r_targetECEF = LLA2ECEF(orbitParams.desiredDropLocation);
             orbitParams.R_ECEF_2_ECI = computeR_ECEF_2_ECI(orbitParams.alpha);
-            Eigen::Vector3d r_targetECI = orbitParams.R_ECEF_2_ECI*r_targetECEF;
+            r_targetECI = orbitParams.R_ECEF_2_ECI*r_targetECEF;
+            timeAtChuteDeployment = globalTime;
             orbitParams.targetLocAtChuteDeployLogged = true;
         }
 
     }
 
     // Log one-time variables of interest to a file.
+    ofstream oneTimeOrbitParamsFile;
+    oneTimeOrbitParamsFile.open("orbitVariablesOfInterest.txt");
+    oneTimeOrbitParamsFile << "Longitude at first pass over desired latitude (deg): " << orbitParams.lonAtDesiredLatFirst*(180/PI) << "\n";
+    oneTimeOrbitParamsFile << "Time of first pass over desired latitude (s): " << orbitParams.timeOfFirstPass << "\n";
+    oneTimeOrbitParamsFile << "Longitude at second pass over desired latitude (deg): " << orbitParams.lonAtDesiredLatSecond*(180/PI) << "\n";
+    oneTimeOrbitParamsFile << "Time of second pass over desired latitude (s): " << orbitParams.timeOfSecondPass << "\n";
+    oneTimeOrbitParamsFile << "Longitude phase shift per orbit (deg): " << orbitParams.lonPhaseShiftPerOrbit*(180/PI) << "\n";
+    oneTimeOrbitParamsFile << "Time of final pass over desired latitude (s): " << orbitParams.timeOfFinalPass << "\n";
+    oneTimeOrbitParamsFile << "Time Between Final Pass and Capsule Deployment (s): " << orbitParams.timeToDropFromFinalPass << "\n";
+    oneTimeOrbitParamsFile << "Ballistic Descent DTheta (deg): " << orbitParams.DTheta*(180/PI) << "\n";
+    oneTimeOrbitParamsFile << "Time of Capsule Deployment (s): " << orbitParams.timeOfDeployment << "\n";
+    oneTimeOrbitParamsFile << "Time that Ballistic Descent Takes (s): " << bd_time << "\n";
+    oneTimeOrbitParamsFile << "Time at Chute Descent Phase Beginning (s): " << timeAtChuteDeployment << "\n";
+    oneTimeOrbitParamsFile << "ECI Location of Satellite at Capsule Deployment Point (m):" << r_DropPointECI << "\n";
+    oneTimeOrbitParamsFile << "ECI Location of Target Point at Ballistic Descent End (m):" << r_targetECI << "\n";
+    oneTimeOrbitParamsFile.close();
 
+    orbitsFile.close();
 
+    // Now, link end of orbits to beginning of EDL ballistic phase.
+    std::ofstream ballisticDescentFile;
+    std::ofstream chuteDescentFile;
+    ballisticDescentFile.open("bd.csv"); // time, V, gamma, h, dtheta_total
+    chuteDescentFile.open("cd.csv"); // time, vx, px, vy, py, vz, pz
 
-
-    orbits_file.close();
-}
-
-
-int main(){
-
-    std::ofstream ballistic_descent_file;
-    std::ofstream chute_descent_file;
-
-    float global_time = 0; // seconds
-
-    ballistic_descent_file.open("bd.csv"); // time, V, gamma, h, dtheta_total
-    chute_descent_file.open("cd.csv"); // time, vx, px, vy, py, vz, pz
-
-    Eigen::Matrix<double, 3, 6> K;
-    K << 3.1696, -0.1525, 0, 137.9086, 0.0058, 0,
-         0.1525, 3.1586, 0, 0.0058, 137.6687, 0,
-         0, 0, 3.1586, 0, 0, 137.6685; // gain matrix for orbit LQR control
-
-    float d_chute = 7.5; // m
-    float CD_chute = 0.8; // drag coefficient of capsule + parachute
-    float m_parachute = 30; // kg
-
-    Parachute chute(d_chute, CD_chute, m_parachute); // Initialize capsule's parachute parameters
-
-    float m_capsule_init = 2530; // starting capsule mass, kg. Includes capsule/payload/lander, heatshield, parachute, and fuel.
-    float m_heatshield = 500; // heatshield mass, kg
-    float m_fuel = 900; // fuel mass, kg
-    float CD_capsule = 1.1; // capsule drag coefficient
-    float A_capsule = 2.5; // capsule cross sectional area on descent side, m^2
-
-    float V_0_ballistic = sqrt(MU_E/(R_EARTH+ORB_ALT)); // initial velocity, m/s
+    float V_0_ballistic = sat.x_ECI(Eigen::seq(3,5)).norm(); // initial velocity, m/s
     float gamma_0_ballistic = 5*(PI/180); // initial flight path angle, rads
-    float h_0_ballistic = ORB_ALT; // initial altitude, m
-
+    float h_0_ballistic =  sat.x_ECI(Eigen::seq(0,2)).norm() - R_EARTH; // initial altitude, m
     Eigen::Vector3d x_ballistic_init(V_0_ballistic, gamma_0_ballistic, h_0_ballistic); // initial ballistic descent state
-
     Capsule capsule(m_capsule_init, m_heatshield, m_fuel, CD_capsule, A_capsule, chute, x_ballistic_init);
 
     // Dynamical perturbations during chute descent
     float vy_perturb = 0.02; // these represent acceleration biases during chute descent, roughly analogous to wind
     float vz_perturb = -0.04; //both vy_perturb and vz_perturb should have absolute value < 0.05
+    float chute_deploy_height = 5000; // m
+    float powered_descent_height = 1000; // m
 
     Eigen::Vector3d x_ballistic_next;
     float total_dtheta = 0; // change in angle relative to chute descent point durign ballistic descent
-
-    ballistic_descent_file << global_time << ","
+    ballisticDescentFile << globalTime << ","
                             << capsule.x_ballistic(0) << ","
                             << capsule.x_ballistic(1) << ","
                             << capsule.x_ballistic(2) << ","
                             << total_dtheta
                             << "\n";
 
-    while (capsule.x_ballistic(2) >= 5000) { // propagate ballistic dynamics and count dtheta for orbit optimization
+    while (capsule.x_ballistic(2) >= chute_deploy_height) { // propagate ballistic dynamics and count dtheta for orbit optimization
         total_dtheta = total_dtheta + (capsule.x_ballistic(0)*cos(capsule.x_ballistic(1))*EDL_DT)/(R_EARTH + capsule.x_ballistic(2));
         x_ballistic_next = propagateBallistic(capsule);
         capsule.x_ballistic = x_ballistic_next;
-        global_time = global_time + EDL_DT;
+        globalTime = globalTime + EDL_DT;
 
-        ballistic_descent_file << global_time << ","
+        ballisticDescentFile << globalTime << ","
                                << capsule.x_ballistic(0) << ","
                                << capsule.x_ballistic(1) << ","
                                << capsule.x_ballistic(2) << ","
@@ -370,13 +367,15 @@ int main(){
     cout << "Total DTheta: ";
     cout << total_dtheta*(180/PI);
 
-    // BALLISTIC DESCENT COMPLETE. MOVE TO CHUTE DESCENT.
+    ballisticDescentFile.close();
+
+    // Ballistic descent phase complete. Move to chute descent.
 
     capsule.x_chute << capsule.x_ballistic(0), capsule.x_ballistic(2), 0, 0, 0, 0; // V (vx), h (px), vy, py, vz, pz
     capsule.m = capsule.m - capsule.m_heatshield;
     Eigen::Matrix<float,6,1> x_chute_next;
 
-    chute_descent_file << global_time << ","
+    chuteDescentFile << globalTime << ","
                        << capsule.x_chute(0) << ","
                        << capsule.x_chute(1) << ","
                        << capsule.x_chute(2) << ","
@@ -386,13 +385,13 @@ int main(){
                        << "\n";
 
 
-    while (capsule.x_chute(1) >= 1000) {
+    while (capsule.x_chute(1) >= powered_descent_height) {
 
         x_chute_next = propagateChute(capsule, vy_perturb, vz_perturb);
         capsule.x_chute = x_chute_next;
-        global_time = global_time + EDL_DT;
+        globalTime = globalTime + EDL_DT;
 
-        chute_descent_file << global_time << ","
+        chuteDescentFile << globalTime << ","
                        << capsule.x_chute(0) << ","
                        << capsule.x_chute(1) << ","
                        << capsule.x_chute(2) << ","
@@ -405,8 +404,9 @@ int main(){
     cout << "State at End of Chute Descent: ";
     cout << capsule.x_chute;
 
-    // CHUTE DESCENT COMPLETE, MOVE TO POWERED DESCENT
+    chuteDescentFile.close();
 
+    // Chute descent phase complete. Move to powered descent and landing.
     capsule.m = capsule.m - capsule.chute.m_parachute;
 
     float Isp = 325; // s
@@ -415,13 +415,12 @@ int main(){
     float alpha = 1/(Isp*SEA_LEVEL_G);
     Eigen::Matrix<float,6,1> x_lander_init;
     x_lander_init << capsule.x_chute(1), capsule.x_chute(3), capsule.x_chute(5), -1*capsule.x_chute(0), capsule.x_chute(2), capsule.x_chute(4);
-
+    // The above state is px, py, pz, vx, vy, vz. px points up from the origin, which is the target location.
+    // It is assumed that chute descen begins perfectly over the target location
     Lander lander(capsule.m, capsule.m_fuel, Isp, Tmax, theta_alt, alpha, x_lander_init);
+    
     // Convex Optimization G-FOLD algorithm for powered descent
 
-
-    ballistic_descent_file.close();
-    chute_descent_file.close();
 
     return 0;
 }
