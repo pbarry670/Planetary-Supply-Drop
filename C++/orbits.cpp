@@ -25,10 +25,10 @@ OrbitParams::OrbitParams(float alpha0, Eigen::Matrix<float,3,6> K, Eigen::Vector
 alpha0(alpha0), K(K), desiredDropLocation(ddl), DTheta(DTheta), DThetaTolerance(DThetaTolerance), timeToDropFromFinalPass(ttdffp), latTolerance(latTol), lonTolerance(lonTol) {
     alpha = alpha0;
 
-    Eigen::Matrix<float,3,3> R_LVLH_2_ECI;
-    Eigen::Matrix<float,3,3> R_ECI_2_LVLH;
-    Eigen::Matrix<float,3,3> R_ECEF_2_ECI;
-    Eigen::Matrix<float,3,3> R_ECI_2_ECEF;
+    Eigen::Matrix3d R_LVLH_2_ECI;
+    Eigen::Matrix3d R_ECI_2_LVLH;
+    Eigen::Matrix3d R_ECEF_2_ECI;
+    Eigen::Matrix3d R_ECI_2_ECEF;
 
     R_LVLH_2_ECI << 1, 0, 0,
                     0, 1, 0,
@@ -148,35 +148,44 @@ Eigen::Matrix<float,6,1> earthOrbitDynamics(Eigen::Matrix<float,6,1> x) {
 
 Eigen::Matrix<float,6,1> propagateActualSatellite(ActualSatellite sat, Eigen::Matrix<float,6,1> x, Eigen::Vector3d u, Eigen::Vector3d r_S2E) {
 
-    Eigen::Matrix<float,6,1> k1 = satelliteActualOrbitDynamics(sat, x, u, r_S2E);
-    Eigen::Matrix<float,6,1> k2 = satelliteActualOrbitDynamics(sat, x + k1*(ORBIT_DT/2), u, r_S2E);
-    Eigen::Matrix<float,6,1> k3 = satelliteActualOrbitDynamics(sat, x + k2*(ORBIT_DT/2), u, r_S2E);
-    Eigen::Matrix<float,6,1> k4 = satelliteActualOrbitDynamics(sat, x + k3*ORBIT_DT, u, r_S2E);
+    //Eigen::Matrix<float,6,1> k1 = satelliteActualOrbitDynamics(sat, x, u, r_S2E);
+    //Eigen::Matrix<float,6,1> k2 = satelliteActualOrbitDynamics(sat, x + k1*(ORBIT_DT/2), u, r_S2E);
+    //Eigen::Matrix<float,6,1> k3 = satelliteActualOrbitDynamics(sat, x + k2*(ORBIT_DT/2), u, r_S2E);
+    //Eigen::Matrix<float,6,1> k4 = satelliteActualOrbitDynamics(sat, x + k3*ORBIT_DT, u, r_S2E);
+    //Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*( (1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4 );
 
-    Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*( (1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4 );
+    Eigen::Matrix<float,6,1> x_dot = satelliteActualOrbitDynamics(sat, x, u, r_S2E);
+    Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*x_dot;
+
     return x_next;
 
 }
 
 Eigen::Matrix<float,6,1> propagateReferenceSatellite(ReferenceSatellite sat, Eigen::Matrix<float,6,1> x) {
 
-    Eigen::Matrix<float,6,1> k1 = satelliteReferenceOrbitDynamics(sat, x);
-    Eigen::Matrix<float,6,1> k2 = satelliteReferenceOrbitDynamics(sat, x + k1*(ORBIT_DT/2));
-    Eigen::Matrix<float,6,1> k3 = satelliteReferenceOrbitDynamics(sat, x + k2*(ORBIT_DT/2));
-    Eigen::Matrix<float,6,1> k4 = satelliteReferenceOrbitDynamics(sat, x + k3*ORBIT_DT);
+    //Eigen::Matrix<float,6,1> k1 = satelliteReferenceOrbitDynamics(sat, x);
+    //Eigen::Matrix<float,6,1> k2 = satelliteReferenceOrbitDynamics(sat, x + k1*(ORBIT_DT/2));
+    //Eigen::Matrix<float,6,1> k3 = satelliteReferenceOrbitDynamics(sat, x + k2*(ORBIT_DT/2));
+    //Eigen::Matrix<float,6,1> k4 = satelliteReferenceOrbitDynamics(sat, x + k3*ORBIT_DT);
+    //Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*( (1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4 );
 
-    Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*( (1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4 );
+    Eigen::Matrix<float,6,1> x_dot = satelliteReferenceOrbitDynamics(sat, x);
+    Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*x_dot;
+
     return x_next;
 }
 
 Eigen::Matrix<float,6,1> propagateEarthState(Eigen::Matrix<float,6,1> x) {
 
-    Eigen::Matrix<float,6,1> k1 = earthOrbitDynamics(x);
-    Eigen::Matrix<float,6,1> k2 = earthOrbitDynamics(x + k1*(ORBIT_DT/2));
-    Eigen::Matrix<float,6,1> k3 = earthOrbitDynamics(x + k2*(ORBIT_DT/2));
-    Eigen::Matrix<float,6,1> k4 = earthOrbitDynamics(x + k3*ORBIT_DT);
+    //Eigen::Matrix<float,6,1> k1 = earthOrbitDynamics(x);
+    //Eigen::Matrix<float,6,1> k2 = earthOrbitDynamics(x + k1*(ORBIT_DT/2));
+    //Eigen::Matrix<float,6,1> k3 = earthOrbitDynamics(x + k2*(ORBIT_DT/2));
+    //Eigen::Matrix<float,6,1> k4 = earthOrbitDynamics(x + k3*ORBIT_DT);
+    //Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*( (1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4 );
 
-    Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*( (1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4 );
+    Eigen::Matrix<float,6,1> x_dot = earthOrbitDynamics(x);
+    Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*x_dot;
+
     return x_next;
 
 }
@@ -190,9 +199,9 @@ Eigen::Matrix<float,6,1> elements2RV(float a, float e, float i, float O, float w
 
     float p = a*(1 - pow(e,2));
     Eigen::Vector3d vPeri;
-    vPeri << sqrt(MU_E/p)*-1*sin(f), sqrt(MU_E/p)*(e+cos(f)); 0;
+    vPeri << sqrt(MU_E/p)*-1*sin(f), sqrt(MU_E/p)*(e+cos(f)), 0;
 
-    Eigen::Matrix<float,3,3> R; // rotation matrix from perifocal frame to ECI frame
+    Eigen::Matrix3d R; // rotation matrix from perifocal frame to ECI frame
 
     R(0,0) = cos(O)*cos(w) - sin(O)*sin(w)*cos(i);
     R(0,1) = -cos(O)*sin(w) - sin(O)*cos(w)*cos(i);
@@ -222,6 +231,7 @@ Eigen::Matrix<float,5,1> RV2elements(Eigen::Matrix<float,6,1> x) {
     Eigen::Vector3d r;
     r << x(0), x(1), x(2);
     Eigen::Vector3d v;
+    v << x(3), x(4), x(5);
     Eigen::Vector3d h = r.cross(v);
 
     float eps = pow(v.norm(), 2)/2 - MU_E/r.norm();
@@ -264,9 +274,9 @@ Eigen::Matrix<float,5,1> RV2elements(Eigen::Matrix<float,6,1> x) {
 
 }
 
-Eigen::Matrix<float,3,3> computeR_ECI_2_LVLH(float i, float O, float T) {
+Eigen::Matrix3d computeR_ECI_2_LVLH(float i, float O, float T) {
 
-    Eigen::Matrix<float,3,3> R;
+    Eigen::Matrix3d R;
     R(0,0) = cos(O)*cos(T) - sin(O)*sin(T)*cos(i);
     R(0,1) = sin(O)*cos(T) + cos(O)*sin(T)*cos(i);
     R(0,2) = sin(T)*sin(i);
@@ -281,9 +291,9 @@ Eigen::Matrix<float,3,3> computeR_ECI_2_LVLH(float i, float O, float T) {
 
 }
 
-Eigen::Matrix<float,3,3> computeR_ECEF_2_ECI(float alpha) {
+Eigen::Matrix3d computeR_ECEF_2_ECI(float alpha) {
 
-    Eigen::Matrix<float,3,3> R;
+    Eigen::Matrix3d R;
     R << cos(alpha), -sin(alpha), 0,
          sin(alpha), cos(alpha), 0,
          0, 0, 1;
@@ -292,12 +302,13 @@ Eigen::Matrix<float,3,3> computeR_ECEF_2_ECI(float alpha) {
 
 }
 
-Eigen::Matrix<float,3,3> computeR_ECI_2_ECEF(float alpha) {
+Eigen::Matrix3d computeR_ECI_2_ECEF(float alpha) {
 
-    Eigen::Matrix<float,3,3> R;
+    Eigen::Matrix3d R;
     R << cos(alpha), sin(alpha), 0,
          sin(alpha), cos(alpha), 0,
          0, 0, 1;
+    return R;
 
 }
 

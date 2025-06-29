@@ -6,7 +6,7 @@
 #include <Eigen/Dense>
 #include "orbits.h"
 
-const float EDL_DT = 0.01; // s
+const float EDL_DT = 0.05; // s
 const float SCALE_HEIGHT = 8420; // m
 const float SEA_LEVEL_RHO = 1.225; // kg/m^3
 const float SEA_LEVEL_G = 9.807; // m/s^2

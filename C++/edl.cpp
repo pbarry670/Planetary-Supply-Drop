@@ -42,8 +42,10 @@ Eigen::Vector3d ballisticDynamics(Capsule capsule, Eigen::Vector3d x_ballistic){
     Eigen::Vector3d xdot; // state derivative vector: Vdot, gammadot, hdot
 
     xdot(0) = (-0.5/capsule.beta)*(rho*pow(x_ballistic(0),2)) + g*sin(x_ballistic(1)); //Vdot
-    xdot(1) = ((-(pow(x_ballistic(0),2)*cos(x_ballistic(1)))/(R_EARTH + x_ballistic(2))) + g*cos(x_ballistic(1)))/x_ballistic(0); //gammadot
-    xdot(2) = -1*x_ballistic(0)*sin(x_ballistic(1));
+
+    xdot(0) = (-1*rho*x_ballistic(0)*x_ballistic(0))/(2*capsule.beta) + g*sin(x_ballistic(1)); // Vdot
+    xdot(1) = (-1*x_ballistic(0)*x_ballistic(0)*cos(x_ballistic(1)))/(x_ballistic(0)*(R_EARTH+x_ballistic(2))) + g*cos(x_ballistic(1))/x_ballistic(0); // gammadot
+    xdot(2) = -1*x_ballistic(0)*sin(x_ballistic(1)); // hdot
 
     return xdot;
 }
@@ -83,6 +85,8 @@ Eigen::Vector3d propagateBallistic(Capsule capsule){
     //Eigen::Vector3d x_next = capsule.x_ballistic + EDL_DT*((1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4);
 
     Eigen::Vector3d x_dot = ballisticDynamics(capsule, capsule.x_ballistic);
+    //cout << x_dot;
+    //cout << "\n";
     Eigen::Vector3d x_next = capsule.x_ballistic + EDL_DT*x_dot;
 
     //cout << "Current: ";
