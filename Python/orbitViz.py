@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from vpython import canvas, sphere, color, vector, textures, distant_light, rate
+from vpython import canvas, sphere, color, vector, textures, distant_light, local_light, arrow, rate
 
 def compute_R_ECI_2_ECEF(alpha):
     R = np.array([[np.cos(alpha), np.sin(alpha), 0],
@@ -23,7 +23,14 @@ def ECI_2_VPython(x, y, z):
 
     return newx, newy, newz
 
-#if __name__ == 'main':
+def LVLH_2_VPython(x, y, z):
+    newx = -y
+    newy = z
+    newz = x
+
+    return newx, newy, newz
+
+# Read orbital data .csv file
 df = pd.read_csv("../C++/orbs.csv", header=None, names=['t',
                                                         'S2Epx','S2Epy','S2Epz','S2Evx','S2Evy','S2Evz',
                                                         'satECIpx','satECIpy','satECIpz','satECIvx','satECIvy','satECIvz',
@@ -87,13 +94,12 @@ Sat_alt = df['satalt']
 # Alpha (angle between ECI and ECEF frames)
 alphas = df['alpha']
 
-#helioCanvas = canvas(title="Heliocentric View", width=400, height=300, background=color.black)
 geoCanvas = canvas(title="Geocentric View", width=400, height=300, background=color.black)
-#lvlhCanvas = canvas(title="Local Vertical Line Heading View", width=400, height=300, background=color.gray)
+helioCanvas = canvas(title="Heliocentric View", width=400, height=300, background=color.black)
+lvlhCanvas = canvas(title="Local Vertical Line Heading View", width=400, height=300, background=vector(0.5,0.5,0.5))
 
 # Set up geoCanvas
-R = 6378*1000 # m
-earth = sphere(canvas=geoCanvas, pos=vector(0,0,0), radius=R, texture=textures.earth, shininess=0)
+earth = sphere(canvas=geoCanvas, pos=vector(0,0,0), radius=6378*1000, texture=textures.earth, shininess=0)
 geoCanvas.lights = []
 distant_light(canvas=geoCanvas, direction=vector(-np.cos(23.5*np.pi/180),-np.sin(23.5*np.pi/180),0), color=vector(0.9,0.9,0.9))
 
@@ -108,10 +114,43 @@ targetx, targety, targetz = ECI_2_VPython(r_target_ECI[0], r_target_ECI[1], r_ta
 target = sphere(canvas=geoCanvas, pos=vector(targetx, targety, targetz), radius = 6378*30, color=color.red, make_trail=False)
 
 satECIx, satECIy, satECIz = ECI_2_VPython(Sat_ECI_px[0], Sat_ECI_py[0], Sat_ECI_pz[0])
-sat = sphere(canvas=geoCanvas, pos=vector(satECIx, satECIy, satECIz), radius = 6378*50, color=color.yellow, make_trail = False)
+sat = sphere(canvas=geoCanvas, pos=vector(satECIx, satECIy, satECIz), radius = 6378*50, color=color.magenta, make_trail = False)
 
 refSatECIx, refSatECIy, refSatECIz = ECI_2_VPython(refSat_ECI_px[0], refSat_ECI_py[0], refSat_ECI_pz[0])
 refSat = sphere(canvas=geoCanvas, pos=vector(refSatECIx, refSatECIy, refSatECIz), radius = 6378*10, color=color.green, make_trail = True)
+
+# Set up helioCanvas
+distance_scalefactor = 100
+sun = sphere(canvas=helioCanvas, pos=vector(0,0,0), radius = 696340000, shininess=0, color=color.yellow)
+helioEx, helioEy, helioEz = ECI_2_VPython(S2E_px[0], S2E_py[0], S2E_pz[0])
+helioEarth = sphere(canvas=helioCanvas, pos=vector(helioEx/distance_scalefactor, helioEy/distance_scalefactor, helioEz/distance_scalefactor), radius = 6378*1000, shininess=0, texture=textures.earth, make_trail=True, trail_radius=6378*100)
+helioCanvas.lights = []
+local_light(canvas=helioCanvas, pos=vector(696340000,696340000,0), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(696340000,0,696340000), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(0,696340000,696340000), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(-696340000,696340000,0), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(-696340000,0,696340000), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(0,-696340000,696340000), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(696340000,-696340000,0), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(696340000,0,-696340000), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(0,696340000,-696340000), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(-696340000,-696340000,0), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(-696340000,0,-696340000), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(0,-696340000,-696340000), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(696340000,696340000,696340000), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(696340000,696340000,-696340000), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(696340000,-696340000,-696340000), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(-696340000,-696340000,-696340000), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(-696340000,696340000,696340000), color=vector(0.9,0.9,0.9))
+local_light(canvas=helioCanvas, pos=vector(-696340000,-696340000,696340000), color=vector(0.9,0.9,0.9))
+helioSat = sphere(canvas=helioCanvas, pos=vector(helioEx/distance_scalefactor + satECIx, helioEy/distance_scalefactor + satECIy, helioEz/distance_scalefactor + satECIz), radius = 6378*100, shininess=0, color=color.magenta, make_trail=True, trail_radius=6378*50, retain=200)
+
+# Set up lvlhCanvas
+origin = sphere(canvas=lvlhCanvas, pos=vector(0,0,0), radius=250, shininess=0, color=color.green)
+relposx, relposy, relposz = LVLH_2_VPython(Sat_LVLH_px[0], Sat_LVLH_py[0], Sat_LVLH_pz[0])
+relctrlx, relctrly, relctrlz = LVLH_2_VPython(u_LVLH_x[0], u_LVLH_y[0], u_LVLH_z[0])
+relativeSat = sphere(canvas=lvlhCanvas, pos=vector(relposx, relposy, relposz), radius=250, shininess=0, color=color.magenta)
+lvlhControl = arrow(canvas=lvlhCanvas, pos=vector(relposx, relposy, relposz), axis=vector(relctrlx, relctrly, relctrlz), color = color.cyan)
 
 w = 2*np.pi/86164 # rotation rate of Earth, rad/s
 count = 0
@@ -119,9 +158,10 @@ t = ts[count]
 dt = ts[2] - ts[1]
 
 while True:
-    rate(5000)
+    rate(500)
     count = count + 1
 
+    # Update geoCanvas
     earth.rotate(origin=vector(0,0,0), axis=vector(0,1,0), angle = w*dt)
     t = ts[count]
     alpha = alphas[count]
@@ -137,6 +177,22 @@ while True:
 
     refSatECIx, refSatECIy, refSatECIz = ECI_2_VPython(refSat_ECI_px[count], refSat_ECI_py[count], refSat_ECI_pz[count])
     refSat.pos = vector(refSatECIx, refSatECIy, refSatECIz)
+
+    # Update helioCanvas
+    helioEx, helioEy, helioEz = ECI_2_VPython(S2E_px[count], S2E_py[count], S2E_pz[count])
+    helioEarth.pos = vector(helioEx/distance_scalefactor, helioEy/distance_scalefactor, helioEz/distance_scalefactor)
+    helioSat.pos = vector(helioEx/distance_scalefactor +satECIx, helioEy/distance_scalefactor +satECIy, helioEz/distance_scalefactor +satECIz)
+    helioEarth.rotate(origin=vector(helioEx/distance_scalefactor + satECIx, helioEy/distance_scalefactor + satECIy, helioEz/distance_scalefactor + satECIz), axis=vector(0,1,0), angle = w*dt)
+
+    # Update lvlhCanvas
+    relposx, relposy, relposz = LVLH_2_VPython(Sat_LVLH_px[count], Sat_LVLH_py[count], Sat_LVLH_pz[count])
+    relctrlx, relctrly, relctrlz = LVLH_2_VPython(u_LVLH_x[count], u_LVLH_y[count], u_LVLH_z[count])
+    relativeSat.pos = vector(relposx, relposy, relposz)
+    lvlhControl.pos = vector(relposx, relposy, relposz)
+    lvlhControl.axis = vector(relctrlx, relctrly, relctrlz)
+    lvlhControl.headwidth = lvlhControl.shaftwidth
+
+
 
 
 
