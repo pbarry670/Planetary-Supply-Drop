@@ -148,14 +148,11 @@ Eigen::Matrix<float,6,1> earthOrbitDynamics(Eigen::Matrix<float,6,1> x) {
 
 Eigen::Matrix<float,6,1> propagateActualSatellite(ActualSatellite sat, Eigen::Matrix<float,6,1> x, Eigen::Vector3d u, Eigen::Vector3d r_S2E) {
 
-    //Eigen::Matrix<float,6,1> k1 = satelliteActualOrbitDynamics(sat, x, u, r_S2E);
-    //Eigen::Matrix<float,6,1> k2 = satelliteActualOrbitDynamics(sat, x + k1*(ORBIT_DT/2), u, r_S2E);
-    //Eigen::Matrix<float,6,1> k3 = satelliteActualOrbitDynamics(sat, x + k2*(ORBIT_DT/2), u, r_S2E);
-    //Eigen::Matrix<float,6,1> k4 = satelliteActualOrbitDynamics(sat, x + k3*ORBIT_DT, u, r_S2E);
-    //Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*( (1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4 );
-
-    Eigen::Matrix<float,6,1> x_dot = satelliteActualOrbitDynamics(sat, x, u, r_S2E);
-    Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*x_dot;
+    Eigen::Matrix<float,6,1> k1 = satelliteActualOrbitDynamics(sat, x, u, r_S2E);
+    Eigen::Matrix<float,6,1> k2 = satelliteActualOrbitDynamics(sat, x + k1*(ORBIT_DT/2), u, r_S2E);
+    Eigen::Matrix<float,6,1> k3 = satelliteActualOrbitDynamics(sat, x + k2*(ORBIT_DT/2), u, r_S2E);
+    Eigen::Matrix<float,6,1> k4 = satelliteActualOrbitDynamics(sat, x + k3*ORBIT_DT, u, r_S2E);
+    Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*(k1/6 + k2/3 + k3/3 + k4/6);
 
     return x_next;
 
@@ -163,28 +160,22 @@ Eigen::Matrix<float,6,1> propagateActualSatellite(ActualSatellite sat, Eigen::Ma
 
 Eigen::Matrix<float,6,1> propagateReferenceSatellite(ReferenceSatellite sat, Eigen::Matrix<float,6,1> x) {
 
-    //Eigen::Matrix<float,6,1> k1 = satelliteReferenceOrbitDynamics(sat, x);
-    //Eigen::Matrix<float,6,1> k2 = satelliteReferenceOrbitDynamics(sat, x + k1*(ORBIT_DT/2));
-    //Eigen::Matrix<float,6,1> k3 = satelliteReferenceOrbitDynamics(sat, x + k2*(ORBIT_DT/2));
-    //Eigen::Matrix<float,6,1> k4 = satelliteReferenceOrbitDynamics(sat, x + k3*ORBIT_DT);
-    //Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*( (1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4 );
-
-    Eigen::Matrix<float,6,1> x_dot = satelliteReferenceOrbitDynamics(sat, x);
-    Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*x_dot;
+    Eigen::Matrix<float,6,1> k1 = satelliteReferenceOrbitDynamics(sat, x);
+    Eigen::Matrix<float,6,1> k2 = satelliteReferenceOrbitDynamics(sat, x + k1*(ORBIT_DT/2));
+    Eigen::Matrix<float,6,1> k3 = satelliteReferenceOrbitDynamics(sat, x + k2*(ORBIT_DT/2));
+    Eigen::Matrix<float,6,1> k4 = satelliteReferenceOrbitDynamics(sat, x + k3*ORBIT_DT);
+    Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*( k1/6 + k2/3 + k3/3 + k4/6 );
 
     return x_next;
 }
 
 Eigen::Matrix<float,6,1> propagateEarthState(Eigen::Matrix<float,6,1> x) {
 
-    //Eigen::Matrix<float,6,1> k1 = earthOrbitDynamics(x);
-    //Eigen::Matrix<float,6,1> k2 = earthOrbitDynamics(x + k1*(ORBIT_DT/2));
-    //Eigen::Matrix<float,6,1> k3 = earthOrbitDynamics(x + k2*(ORBIT_DT/2));
-    //Eigen::Matrix<float,6,1> k4 = earthOrbitDynamics(x + k3*ORBIT_DT);
-    //Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*( (1/6)*k1 + (1/3)*k2 + (1/3)*k3 + (1/6)*k4 );
-
-    Eigen::Matrix<float,6,1> x_dot = earthOrbitDynamics(x);
-    Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*x_dot;
+    Eigen::Matrix<float,6,1> k1 = earthOrbitDynamics(x);
+    Eigen::Matrix<float,6,1> k2 = earthOrbitDynamics(x + k1*(ORBIT_DT/2));
+    Eigen::Matrix<float,6,1> k3 = earthOrbitDynamics(x + k2*(ORBIT_DT/2));
+    Eigen::Matrix<float,6,1> k4 = earthOrbitDynamics(x + k3*ORBIT_DT);
+    Eigen::Matrix<float,6,1> x_next = x + ORBIT_DT*( k1/6 + k2/3 + k3/3 + k4/6 );
 
     return x_next;
 

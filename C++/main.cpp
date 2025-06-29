@@ -229,56 +229,56 @@ int main(){
     cout << "\n";
 
     // Now, compute and execute the Delta-V necessary for the satellite to reach a desired orbit necessary to pass over the drop point.
-    Eigen::Matrix<float,5,1> orbElemsAct = RV2elements(sat.x_ECI);
-    Eigen::Matrix<float,5,1> orbElemsRef = RV2elements(sat.x_ECI);
+    //Eigen::Matrix<float,5,1> orbElemsAct = RV2elements(sat.x_ECI);
+    //Eigen::Matrix<float,5,1> orbElemsRef = RV2elements(sat.x_ECI);
     float iDesired = orbitParams.desiredDropLocation(0);
-    float Delta_i_act = iDesired - orbElemsAct(2);
-    float Delta_i_ref = iDesired - orbElemsRef(2);
-    // Find Delta-V for actual satellite
-    Eigen::Vector3d vCurrentAct;
-    vCurrentAct << sat.x_ECI(3), sat.x_ECI(4), sat.x_ECI(5);
-    float vAct = vCurrentAct.norm();
-    float DVAct = 2*vAct*sin(Delta_i_act/2);
-    sat.x_ECI(5) = sat.x_ECI(5) + DVAct;
-
-    // Find Delta-V for reference satellite
-    Eigen::Vector3d vCurrentRef;
-    vCurrentRef << refSat.x_ECI(3), refSat.x_ECI(4), refSat.x_ECI(5);
-    float vRef = vCurrentRef.norm();
-    float DVRef = 2*vRef*sin(Delta_i_ref/2);
-    refSat.x_ECI(5) = sat.x_ECI(5) + DVRef;
-
-    cout << "\n";
-    cout << "Actual Delta-V applied: " << DVAct;
-
-    cout << "\n";
-    cout << "Reference Delta-V applied: " << DVRef;
-    cout << "\n";
-
-
+    //float Delta_i_act = iDesired - orbElemsAct(2);
+    //float Delta_i_ref = iDesired - orbElemsRef(2);
     // Find Delta-V for actual satellite
     //Eigen::Vector3d vCurrentAct;
     //vCurrentAct << sat.x_ECI(3), sat.x_ECI(4), sat.x_ECI(5);
-    //Eigen::Matrix<float, 5, 1> orbElemsAct = RV2elements(sat.x_ECI);
-    //Eigen::Matrix<float, 6, 1> xDesiredAct = elements2RV(orbElemsAct(0), orbElemsAct(1), iDesired, orbElemsAct(3), orbElemsAct(4), 0);
-    //Eigen::Vector3d vDesiredAct(xDesiredAct(3), xDesiredAct(4), xDesiredAct(5));
-    //Eigen::Vector3d DeltaVAct = vDesiredAct - vCurrentAct;
+    //float vAct = vCurrentAct.norm();
+    //float DVAct = 2*vAct*sin(Delta_i_act/2);
+    //sat.x_ECI(5) = sat.x_ECI(5) + DVAct;
 
     // Find Delta-V for reference satellite
     //Eigen::Vector3d vCurrentRef;
     //vCurrentRef << refSat.x_ECI(3), refSat.x_ECI(4), refSat.x_ECI(5);
-    //Eigen::Matrix<float, 5, 1> orbElemsRef = RV2elements(refSat.x_ECI);
-    //Eigen::Matrix<float, 6, 1> xDesiredRef = elements2RV(orbElemsAct(0), orbElemsAct(1), iDesired, orbElemsAct(3), orbElemsAct(4), 0);
-    //Eigen::Vector3d vDesiredRef(xDesiredRef(3), xDesiredRef(4), xDesiredRef(5));
-    //Eigen::Vector3d DeltaVRef = vDesiredRef - vCurrentRef;
+    //float vRef = vCurrentRef.norm();
+    //float DVRef = 2*vRef*sin(Delta_i_ref/2);
+    //refSat.x_ECI(5) = sat.x_ECI(5) + DVRef;
+
+    // Find Delta-V for actual satellite
+    Eigen::Vector3d vCurrentAct;
+    vCurrentAct << sat.x_ECI(3), sat.x_ECI(4), sat.x_ECI(5);
+    Eigen::Matrix<float, 5, 1> orbElemsAct = RV2elements(sat.x_ECI);
+    Eigen::Matrix<float, 6, 1> xDesiredAct = elements2RV(orbElemsAct(0), orbElemsAct(1), iDesired, orbElemsAct(3), orbElemsAct(4), 0);
+    Eigen::Vector3d vDesiredAct(xDesiredAct(3), xDesiredAct(4), xDesiredAct(5));
+    Eigen::Vector3d DeltaVAct = vDesiredAct - vCurrentAct;
+
+    // Find Delta-V for reference satellite
+    Eigen::Vector3d vCurrentRef;
+    vCurrentRef << refSat.x_ECI(3), refSat.x_ECI(4), refSat.x_ECI(5);
+    Eigen::Matrix<float, 5, 1> orbElemsRef = RV2elements(refSat.x_ECI);
+    Eigen::Matrix<float, 6, 1> xDesiredRef = elements2RV(orbElemsAct(0), orbElemsAct(1), iDesired, orbElemsAct(3), orbElemsAct(4), 0);
+    Eigen::Vector3d vDesiredRef(xDesiredRef(3), xDesiredRef(4), xDesiredRef(5));
+    Eigen::Vector3d DeltaVRef = vDesiredRef - vCurrentRef;
 
     // Apply Delta-V
-    //sat.x_ECI(3) = sat.x_ECI(3) + DeltaVAct(0);
-    //sat.x_ECI(4) = sat.x_ECI(4) + DeltaVAct(1);
-    //sat.x_ECI(5) = sat.x_ECI(5) + DeltaVAct(2);
-    //refSat.x_ECI(3) = refSat.x_ECI(3) + DeltaVRef(0);
-    //refSat.x_ECI(4) = refSat.x_ECI(4) + DeltaVRef(1);
-    //refSat.x_ECI(5) = refSat.x_ECI(5) + DeltaVRef(2);
+    sat.x_ECI(3) = sat.x_ECI(3) + DeltaVAct(0);
+    sat.x_ECI(4) = sat.x_ECI(4) + DeltaVAct(1);
+    sat.x_ECI(5) = sat.x_ECI(5) + DeltaVAct(2);
+    refSat.x_ECI(3) = refSat.x_ECI(3) + DeltaVRef(0);
+    refSat.x_ECI(4) = refSat.x_ECI(4) + DeltaVRef(1);
+    refSat.x_ECI(5) = refSat.x_ECI(5) + DeltaVRef(2);
+
+       cout << "\n";
+    cout << "Actual Delta-V applied: " << DeltaVAct;
+
+    cout << "\n";
+    cout << "Reference Delta-V applied: " << DeltaVRef;
+    cout << "\n";
+
   
     // Continue propagating the orbit that passes over the drop point at its zenith until the capsule drops
     while (!orbitParams.hasDeployed) {
