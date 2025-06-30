@@ -422,8 +422,8 @@ int main(){
     Capsule capsule(m_capsule_init, m_heatshield, m_fuel, CD_capsule, A_capsule, chute, x_ballistic_init);
 
     // Dynamical perturbations during chute descent
-    vy_perturb = 0.02; // these represent acceleration biases during chute descent, roughly analogous to wind
-    vz_perturb = -0.04; //both vy_perturb and vz_perturb should have absolute value < 0.05
+    vy_perturb = 0.23; // these represent acceleration biases during chute descent, roughly analogous to wind
+    vz_perturb = -0.12; //both vy_perturb and vz_perturb should have absolute value < 0.05
     chute_deploy_height = 5000; // m
     float powered_descent_height = 1000; // m
 

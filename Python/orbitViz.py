@@ -40,9 +40,11 @@ df = pd.read_csv("../C++/orbs.csv", header=None, names=['t',
                                                         'satLVLHpx','satLVLHpy','satLVLHpz','satLVLHvx','satLVLHvy','satLVLHvz',
                                                         'satlat', 'satlon', 'satalt',
                                                         'alpha'])
+numrows, numcols = df.shape
 
 # Time array
 ts = df['t']
+ts = np.array(ts)
 
 # State of Earth w.r.t. Sun
 S2E_px = df['S2Epx']
@@ -155,9 +157,11 @@ lvlhControl = arrow(canvas=lvlhCanvas, pos=vector(relposx, relposy, relposz), ax
 w = 2*np.pi/86164 # rotation rate of Earth, rad/s
 count = 0
 t = ts[count]
-dt = ts[2] - ts[1]
+dt = ts[1] - ts[0]
 
-while True:
+
+hasReachedFinalTime = False
+while not hasReachedFinalTime:
     rate(500)
     count = count + 1
 
@@ -191,6 +195,11 @@ while True:
     lvlhControl.pos = vector(relposx, relposy, relposz)
     lvlhControl.axis = vector(relctrlx, relctrly, relctrlz)
     lvlhControl.headwidth = lvlhControl.shaftwidth
+
+    if t == ts[-1]:
+        hasReachedFinalTime = True
+
+print("Orbital visualization complete! \n")
 
 
 
