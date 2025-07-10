@@ -11,8 +11,11 @@ d(d), CD(CD), m_parachute(m_parachute) { A = PI*(d/2)*(d/2); }
 Capsule::Capsule(float m, float m_heatshield, float m_fuel, float CD, float A, Parachute chute, Eigen::Vector3d x_ballistic) : 
 m(m), m_heatshield(m_heatshield), m_fuel(m_fuel), chute(chute), x_ballistic(x_ballistic) { beta = m/(CD*A); }
 
-Lander::Lander(float m_wet, float m_fuel, float Isp, float Tmax, float theta_alt, float alpha, Eigen::Matrix<float,6,1> x_lander) :
-m_wet(m_wet), m_fuel(m_fuel), Isp(Isp), Tmax(Tmax), theta_alt(theta_alt), alpha(alpha), x_lander(x_lander) { Tmin = 0.3*Tmax; }
+Lander::Lander(float m_wet, float m_fuel, float Isp, float Tmax, Eigen::Vector3d n_Tpoint, Eigen::Matrix<float,6,1> x_lander) :
+m_wet(m_wet), m_fuel(m_fuel), Isp(Isp), Tmax(Tmax), n_Tpoint(n_Tpoint), x_lander(x_lander) { 
+    Tmin = 0.3*Tmax;
+    alpha = 1/(Isp*SEA_LEVEL_G);
+ }
 
 
 void Capsule::setBallisticState(float V, float gamma, float h) {

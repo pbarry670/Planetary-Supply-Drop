@@ -6,6 +6,9 @@ using namespace std;
 #include "../include/orbits.h"
 #include <thread>
 #include <chrono>
+#include <pybind11/embed.h>
+#include <pybind11/stl.h>
+namespace py = pybind11;
 
 
 
@@ -503,15 +506,36 @@ int main(){
     float Isp = 325; // s
     float Tmax = 5000; // N
     float theta_alt = 87*(PI/180); // radians. Maximum glide angle
-    float alpha = 1/(Isp*SEA_LEVEL_G);
     Eigen::Matrix<float,6,1> x_lander_init;
     x_lander_init << capsule.x_chute(1), capsule.x_chute(3), capsule.x_chute(5), -1*capsule.x_chute(0), capsule.x_chute(2), capsule.x_chute(4);
+    Eigen::Vector3d n_Tpoint;
+    n_Tpoint << 1.0, 0.0, 0.0;
     // The above state is px, py, pz, vx, vy, vz. px points up from the origin, which is the target location.
     // It is assumed that chute descen begins perfectly over the target location
-    Lander lander(capsule.m, capsule.m_fuel, Isp, Tmax, theta_alt, alpha, x_lander_init);
+
+    Lander lander(capsule.m, capsule.m_fuel, Isp, Tmax, n_Tpoint, x_lander_init);
+
+    // Other G_FOLD parameters
+    float gamma_gs = 87*(PI/180); // radians. Maximum glide angle
+    float theta = 45*(PI/180); //radians. Maximum deviation of thrusters from n_Tpoint
+    float Vmax = 100; // m/s. Maximum speed allowable for glider
+
+    float tf = 500; // seconds. Time for powered descent trajectory optimization
+
     
     // Convex Optimization G-FOLD algorithm for powered descent
+    std::vector<float> passedVals = {Lander.x_lander(0), Lander.x_lander(1), Lander.x_lander(2), Lander.x_lander(3), Lander.x_lander(4), Lander.x_lander(5),
+                                        Lander.n_Tpoint(0), Lander.n_Tpoint(1), Lander.n_Tpoint(2),
+                                        Lander.m_wet, Lander.m_fuel, Lander.Tmin, Lander.Tmax, Lander.alpha,
+                                        gamma_gs, theta, Vmax, tf};
+    py::scoped_interpreter guard{};
+    py::module_ gfoldSolver = py::module_::import("gfoldSolver");
+    std::vector<float> gfoldData = gfoldSolver.attr("solveGfoldOptim")(passedVals).cast<std::vector<float>>();
 
+    //for (float f : gfoldData) {
+    //    std::cout << "From Python list: " << f << std::endl;
+    //}
 
+    //g++ src/edl.cpp src/orbits.cpp src/main.cpp -o main `python3 -m pybind11 --includes` `python3-config --ldflags` -std=c++17
     return 0;
 }

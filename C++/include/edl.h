@@ -51,12 +51,12 @@ struct Lander {
     float Isp; // specific impulse, s
     float Tmin; // minimum thrust, N
     float Tmax; // maximum thrust, N
-    float theta_alt; // max angle with respect to vertical, deg
     float alpha; // fuel consumption parameter
 
+    Eigen::Vector3d n_Tpoint;
     Eigen::Matrix<float,6,1> x_lander;
     
-    Lander(float m_wet, float m_fuel, float Isp, float Tmax, float theta_alt, float alpha, Eigen::Matrix<float,6,1> x_lander);
+    Lander(float m_wet, float m_fuel, float Isp, float Tmax, Eigen::Vector3d n_Tpoint, Eigen::Matrix<float,6,1> x_lander);
 
 };
 
