@@ -11,7 +11,7 @@ def LL_2_VPython(x, y):
 
     return xnew, ynew
 
-df_c = pd.read_csv("../C++/cd.csv", header=None)
+df_c = pd.read_csv("../C++/results/cd.csv", header=None)
 ts_c = np.array(df_c[0])
 vxs = np.array(df_c[1])
 pxs = np.array(df_c[2])

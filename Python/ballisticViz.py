@@ -10,7 +10,7 @@ def LL_2_VPython(x, y):
     return xnew, ynew
 
 # Read ballistic descent data from a .csv file
-df_bd = pd.read_csv("../C++/bd.csv", header=None, names = ['t', 'V', 'gamma', 'h', 'totalDTheta'])
+df_bd = pd.read_csv("../C++/results/bd.csv", header=None, names = ['t', 'V', 'gamma', 'h', 'totalDTheta'])
 numrows_bd, numcols_bd = df_bd.shape
 
 ts_b = df_bd['t']

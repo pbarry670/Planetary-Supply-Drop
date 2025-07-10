@@ -4,7 +4,7 @@
             "name": "Win32",
             "includePath": [
                 "${workspaceFolder}/**",
-                "C:/Users/pbarr/.vscode/extensions/eigen-3.4.0"
+                "C:/Users/pbarr/.vscode/Programs/Planetary-Supply-Drop/C++/lib/eigen-3.3.7"
             ],
             "defines": [
                 "_DEBUG",
@@ -12,8 +12,8 @@
                 "_UNICODE"
             ],
             "windowsSdkVersion": "10.0.22621.0",
-            "cStandard": "c17",
-            "cppStandard": "c++17",
+            "cStandard": "c11",
+            "cppStandard": "c++11",
             "intelliSenseMode": "windows-msvc-x64"
         }
     ],

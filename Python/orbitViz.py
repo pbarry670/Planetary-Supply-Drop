@@ -31,7 +31,7 @@ def LVLH_2_VPython(x, y, z):
     return newx, newy, newz
 
 # Read orbital data .csv file
-df = pd.read_csv("../C++/orbs.csv", header=None, names=['t',
+df = pd.read_csv("../C++/results/orbs.csv", header=None, names=['t',
                                                         'S2Epx','S2Epy','S2Epz','S2Evx','S2Evy','S2Evz',
                                                         'satECIpx','satECIpy','satECIpz','satECIvx','satECIvy','satECIvz',
                                                         'refECIpx', 'refECIpy','refECIpz','refECIvx','refECIvy','refECIvz',
