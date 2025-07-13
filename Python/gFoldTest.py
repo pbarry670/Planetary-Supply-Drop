@@ -1,41 +1,6 @@
 import numpy as np
 import cvxpy as cp
 
-def solveGfoldOptim(passedVals):
-    
-
-    state0 = [passedVals(0), passedVals(1), passedVals(2), passedVals(3), passedVals(4), passedVals(5)]
-
-    n_T = [passedVals(6), passedVals(7), passedVals(8)]
-
-    m_wet = passedVals(9)
-    m_fuel = passedVals(10)
-
-    T_min = passedVals(11)
-    T_max = passedVals(12)
-    alpha = passedVals(13)
-    gamma_gs = passedVals(14)
-    theta = passedVals(15)
-    Vmax = passedVals(16)
-
-    g_mag = passedVals(17)
-
-    tf = passedVals(18)
-    dt = passedVals(19)
-
-    status, miss_dist, traj_hist, m_hist, T_hist = solve_p3(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, Vmax, g_mag, tf, dt)
-    
-    d_p3star = traj_hist[-1, 1:2]
-
-    status, miss_dist, traj_hist, m_hist, T_hist = solve_p4(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, Vmax, g_mag, tf, dt, d_p3star)
-    
-
-
-
-    return [1.1, 2.2, 3.3]
-
-
-
 def solve_p3(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, Vmax, g_mag, tf, dt):
 
     # Problem Data
@@ -206,5 +171,35 @@ def solve_p4(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, V
     T_hist = np.array(T.value)
 
     return status, miss_dist, traj_hist, m_hist, T_hist
+
+if __name__ == "__main__":
+    
+
+    state0 = [1000, 100, 200, -34, -5, -5]
+
+    n_T = [1, 0, 0]
+
+    m_wet = 2000
+    m_fuel = 900
+
+    T_min = 0.3*5000
+    T_max = 5000
+    alpha = 1/(325*9.807)
+    gamma_gs = 5*(np.pi/180)
+    theta = 40*(np.pi/180)
+    Vmax = 200
+
+    g_mag = 9.807
+
+    tf = 500
+    dt = 0.5
+
+    status, miss_dist, traj_hist, m_hist, T_hist = solve_p3(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, Vmax, g_mag, tf, dt)
+    
+    print(status)
+
+    d_p3star = traj_hist[-1, 1:2]
+
+    #status, miss_dist, traj_hist, m_hist, T_hist = solve_p4(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, Vmax, g_mag, tf, dt, d_p3star)
 
 

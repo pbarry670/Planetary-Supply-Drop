@@ -505,7 +505,6 @@ int main(){
 
     float Isp = 325; // s
     float Tmax = 5000; // N
-    float theta_alt = 87*(PI/180); // radians. Maximum glide angle
     Eigen::Matrix<float,6,1> x_lander_init;
     x_lander_init << capsule.x_chute(1), capsule.x_chute(3), capsule.x_chute(5), -1*capsule.x_chute(0), capsule.x_chute(2), capsule.x_chute(4);
     Eigen::Vector3d n_Tpoint;
@@ -516,18 +515,17 @@ int main(){
     Lander lander(capsule.m, capsule.m_fuel, Isp, Tmax, n_Tpoint, x_lander_init);
 
     // Other G_FOLD parameters
-    float gamma_gs = 87*(PI/180); // radians. Maximum glide angle
-    float theta = 45*(PI/180); //radians. Maximum deviation of thrusters from n_Tpoint
-    float Vmax = 100; // m/s. Maximum speed allowable for glider
+    float gamma_gs = 5*(PI/180); // radians. Minimum glide angle
+    float theta = 40*(PI/180); //radians. Maximum deviation of thrusters from n_Tpoint
+    float Vmax = 200; // m/s. Maximum speed allowable for glider
 
     float tf = 500; // seconds. Time for powered descent trajectory optimization
-
     
     // Convex Optimization G-FOLD algorithm for powered descent
     std::vector<float> passedVals = {Lander.x_lander(0), Lander.x_lander(1), Lander.x_lander(2), Lander.x_lander(3), Lander.x_lander(4), Lander.x_lander(5),
                                         Lander.n_Tpoint(0), Lander.n_Tpoint(1), Lander.n_Tpoint(2),
                                         Lander.m_wet, Lander.m_fuel, Lander.Tmin, Lander.Tmax, Lander.alpha,
-                                        gamma_gs, theta, Vmax, tf};
+                                        gamma_gs, theta, Vmax, SEA_LEVEL_G, tf, GFOLD_DT};
     py::scoped_interpreter guard{};
     py::module_ gfoldSolver = py::module_::import("gfoldSolver");
     std::vector<float> gfoldData = gfoldSolver.attr("solveGfoldOptim")(passedVals).cast<std::vector<float>>();
