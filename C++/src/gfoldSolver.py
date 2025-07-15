@@ -28,7 +28,6 @@ def solveGfoldOptim(passedVals):
     d_p3star = traj_hist[-1, 1:2]
 
     status, miss_dist, traj_hist, m_hist, T_hist = solve_p4(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, Vmax, g_mag, tf, dt, d_p3star)
-    
 
 
 
@@ -39,20 +38,20 @@ def solveGfoldOptim(passedVals):
 def solve_p3(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, Vmax, g_mag, tf, dt):
 
     # Problem Data
-    x0 = state0(0)
-    y0 = state0(1)
-    z0 = state0(2)
-    xdot0 = state0(3)
-    ydot0 = state0(4)
-    zdot0 = state0(5)
+    x0 = state0[0]
+    y0 = state0[1]
+    z0 = state0[2]
+    xdot0 = state0[3]
+    ydot0 = state0[4]
+    zdot0 = state0[5]
 
-    n_Tx = n_T(0)
-    n_Ty = n_T(1)
-    n_Tz = n_T(2)
+    n_Tx = n_T[0]
+    n_Ty = n_T[1]
+    n_Tz = n_T[2]
 
-    g = np.arr([-1*g_mag, 0, 0])
+    g = np.array([-1*g_mag, 0, 0])
 
-    N = tf/dt
+    N = int(tf/dt)
 
     # Construct the problem
     x = cp.Variable((N+1, 6))
@@ -74,7 +73,7 @@ def solve_p3(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, V
                   [0, 1, 0],
                   [0, 0, 1]])
 
-    objective = cp.norm(x[N+1, 1:2]) # Minimize the yz-distance from the origin, which is the target
+    objective = cp.norm(x[N, 1:2]) # Minimize the yz-distance from the origin, which is the target
 
     # Construct the constraints
     constraints = []
@@ -91,7 +90,7 @@ def solve_p3(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, V
         constraints.extend(dyn_constr, m_constr, vmax_constr, glideslope_constr, Tnorm_constr, Tmin_constr, Tmax_constr, Tpoint_constr)
 
     initial_m_constr = m[0] == m_wet
-    final_m_constr = m[N] >= m_wet = m_fuel
+    final_m_constr = m[N] >= m_wet - m_fuel
     initial_xpos_constr = x[0,0] == x0
     initial_ypos_constr = x[0,1] == y0
     initial_zpos_constr = x[0,2] == z0
@@ -124,20 +123,20 @@ def solve_p3(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, V
 def solve_p4(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, Vmax, g_mag, tf, dt, d_p3star):
 
     # Problem Data
-    x0 = state0(0)
-    y0 = state0(1)
-    z0 = state0(2)
-    xdot0 = state0(3)
-    ydot0 = state0(4)
-    zdot0 = state0(5)
+    x0 = state0[0]
+    y0 = state0[1]
+    z0 = state0[2]
+    xdot0 = state0[3]
+    ydot0 = state0[4]
+    zdot0 = state0[5]
 
-    n_Tx = n_T(0)
-    n_Ty = n_T(1)
-    n_Tz = n_T(2)
+    n_Tx = n_T[0]
+    n_Ty = n_T[1]
+    n_Tz = n_T[2]
 
-    g = np.arr([-1*g_mag, 0, 0])
+    g = np.array([-1*g_mag, 0, 0])
 
-    N = tf/dt
+    N = int(tf/dt)
 
     # Construct the problem
     x = cp.Variable((N+1, 6))
@@ -176,7 +175,7 @@ def solve_p4(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, V
         constraints.extend(dyn_constr, m_constr, vmax_constr, glideslope_constr, Tnorm_constr, Tmin_constr, Tmax_constr, Tpoint_constr)
 
     initial_m_constr = m[0] == m_wet
-    final_m_constr = m[N] >= m_wet = m_fuel
+    final_m_constr = m[N] >= m_wet - m_fuel
     initial_xpos_constr = x[0,0] == x0
     initial_ypos_constr = x[0,1] == y0
     initial_zpos_constr = x[0,2] == z0
