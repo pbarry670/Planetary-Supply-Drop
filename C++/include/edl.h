@@ -54,10 +54,10 @@ struct Lander {
     float Tmax; // maximum thrust, N
     float alpha; // fuel consumption parameter
 
-    Eigen::Vector3d n_Tpoint;
+    float n_Tpoint[3];
     Eigen::Matrix<float,6,1> x_lander;
     
-    Lander(float m_wet, float m_fuel, float Isp, float Tmax, Eigen::Vector3d n_Tpoint, Eigen::Matrix<float,6,1> x_lander);
+    Lander(float m_wet, float m_fuel, float Isp, float Tmax, float n_Tpoint[3], Eigen::Matrix<float,6,1> x_lander);
 
 };
 

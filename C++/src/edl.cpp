@@ -11,10 +11,13 @@ d(d), CD(CD), m_parachute(m_parachute) { A = PI*(d/2)*(d/2); }
 Capsule::Capsule(float m, float m_heatshield, float m_fuel, float CD, float A, Parachute chute, Eigen::Vector3d x_ballistic) : 
 m(m), m_heatshield(m_heatshield), m_fuel(m_fuel), chute(chute), x_ballistic(x_ballistic) { beta = m/(CD*A); }
 
-Lander::Lander(float m_wet, float m_fuel, float Isp, float Tmax, Eigen::Vector3d n_Tpoint, Eigen::Matrix<float,6,1> x_lander) :
-m_wet(m_wet), m_fuel(m_fuel), Isp(Isp), Tmax(Tmax), n_Tpoint(n_Tpoint), x_lander(x_lander) { 
+Lander::Lander(float m_wet, float m_fuel, float Isp, float Tmax, float n_Tpt[3], Eigen::Matrix<float,6,1> x_lander) :
+m_wet(m_wet), m_fuel(m_fuel), Isp(Isp), Tmax(Tmax), x_lander(x_lander) { 
     Tmin = 0.3*Tmax;
     alpha = 1/(Isp*SEA_LEVEL_G);
+    n_Tpoint[0] = n_Tpt[0];
+    n_Tpoint[1] = n_Tpt[1];
+    n_Tpoint[2] = n_Tpt[2];
  }
 
 
@@ -32,9 +35,6 @@ void Capsule::setChuteState(float vx, float x, float vy, float y, float vz, floa
         x_chute(4) = vz;
         x_chute(5) = z;
     }
-
-
-
 
 Eigen::Vector3d ballisticDynamics(Capsule capsule, Eigen::Vector3d x_ballistic){
 

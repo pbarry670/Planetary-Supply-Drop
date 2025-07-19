@@ -11,7 +11,7 @@
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
                 "-I",
-                "C:/Users/pbarr/.vscode/Programs/Planetary-Supply-Drop/C++/lib/eigen-3.3.7"
+                "C:/Users/pbarr/.vscode/extensions/eigen-3.4.0"
             ],
             "options": {
                 "cwd": "c:\\MinGW\\bin"

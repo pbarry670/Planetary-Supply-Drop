@@ -2,13 +2,12 @@
 using namespace std;
 #include <Eigen/Dense>
 #include <fstream>
+#include <vector>
 #include "../include/edl.h"
 #include "../include/orbits.h"
 #include <thread>
 #include <chrono>
-#include <pybind11/embed.h>
-#include <pybind11/stl.h>
-namespace py = pybind11;
+#include <Python.h>
 
 
 
@@ -30,7 +29,7 @@ int main(){
 
     float m_capsule_init = 2530; // starting capsule mass, kg. Includes capsule/payload/lander, heatshield, parachute, and fuel.
     float m_heatshield = 500; // heatshield mass, kg
-    float m_fuel = 900; // fuel mass, kg
+    float m_fuel = 1200; // fuel mass, kg
     float CD_capsule = 1.1; // capsule drag coefficient
     float A_capsule = 2.5; // capsule cross sectional area on descent side, m^2
 
@@ -425,8 +424,8 @@ int main(){
     Capsule capsule(m_capsule_init, m_heatshield, m_fuel, CD_capsule, A_capsule, chute, x_ballistic_init);
 
     // Dynamical perturbations during chute descent
-    vy_perturb = 0.23; // these represent acceleration biases during chute descent, roughly analogous to wind
-    vz_perturb = -0.12; //both vy_perturb and vz_perturb should have absolute value < 0.05
+    vy_perturb = 0.02; // these represent acceleration biases during chute descent, roughly analogous to wind
+    vz_perturb = -0.04; //both vy_perturb and vz_perturb should have absolute value < 0.05
     chute_deploy_height = 5000; // m
     float powered_descent_height = 1000; // m
 
@@ -503,37 +502,143 @@ int main(){
     // Chute descent phase complete. Move to powered descent and landing.
     capsule.m = capsule.m - capsule.chute.m_parachute;
 
-    float Isp = 325; // s
-    float Tmax = 5000; // N
+    float Isp = 300; // s
+    float Tmax = 20000; // N
     Eigen::Matrix<float,6,1> x_lander_init;
     x_lander_init << capsule.x_chute(1), capsule.x_chute(3), capsule.x_chute(5), -1*capsule.x_chute(0), capsule.x_chute(2), capsule.x_chute(4);
-    Eigen::Vector3d n_Tpoint;
-    n_Tpoint << 1.0, 0.0, 0.0;
+    float n_Tpoint[] = {-1.0, 0.0, 0.0};
     // The above state is px, py, pz, vx, vy, vz. px points up from the origin, which is the target location.
     // It is assumed that chute descen begins perfectly over the target location
 
     Lander lander(capsule.m, capsule.m_fuel, Isp, Tmax, n_Tpoint, x_lander_init);
 
     // Other G_FOLD parameters
-    float gamma_gs = 5*(PI/180); // radians. Minimum glide angle
-    float theta = 40*(PI/180); //radians. Maximum deviation of thrusters from n_Tpoint
-    float Vmax = 200; // m/s. Maximum speed allowable for glider
+    float gamma_gs = 20*(PI/180); // radians. Minimum glide angle
+    float theta = 75*(PI/180); //radians. Maximum deviation of thrusters from n_Tpoint
+    float Vmax = 150; // m/s. Maximum speed allowable for glider
 
-    float tf = 500; // seconds. Time for powered descent trajectory optimization
+    float tf = 75; // seconds. Time for powered descent trajectory optimization
     
+    float passedVals[20] = {lander.x_lander(0), lander.x_lander(1), lander.x_lander(2), lander.x_lander(3), lander.x_lander(4), lander.x_lander(5),
+                                lander.n_Tpoint[0], lander.n_Tpoint[1], lander.n_Tpoint[2],
+                                lander.m_wet, lander.m_fuel, lander.Tmin, lander.Tmax, lander.alpha,
+                                gamma_gs, theta, Vmax, SEA_LEVEL_G, tf, GFOLD_DT};
+    int passedValsSize = sizeof(passedVals)/sizeof(passedVals[0]);
+
     // Convex Optimization G-FOLD algorithm for powered descent
-    std::vector<float> passedVals = {Lander.x_lander(0), Lander.x_lander(1), Lander.x_lander(2), Lander.x_lander(3), Lander.x_lander(4), Lander.x_lander(5),
-                                        Lander.n_Tpoint(0), Lander.n_Tpoint(1), Lander.n_Tpoint(2),
-                                        Lander.m_wet, Lander.m_fuel, Lander.Tmin, Lander.Tmax, Lander.alpha,
-                                        gamma_gs, theta, Vmax, SEA_LEVEL_G, tf, GFOLD_DT};
-    py::scoped_interpreter guard{};
-    py::module_ gfoldSolver = py::module_::import("gfoldSolver");
-    std::vector<float> gfoldData = gfoldSolver.attr("solveGfoldOptim")(passedVals).cast<std::vector<float>>();
+    Py_Initialize();
+    
+    PyObject* pyList = PyList_New(passedValsSize);
+    for (int i = 0; i < passedValsSize; ++i) {
+        PyList_SetItem(pyList, i, PyFloat_FromDouble(passedVals[i]));
+    }
+    //cout << "\n";
+    //cout << "Passed Args: " << "\n";
+    // Convert PyObject to a string representation
+    //PyObject* repr = PyObject_Repr(pyList);  // Get the string representation
+    //PyObject* str = PyUnicode_AsEncodedString(repr, "utf-8", "~E~");  // Encode to UTF-8
+    //const char* bytes = PyBytes_AS_STRING(str);  // Extract C string
+    //cout << bytes << endl;
+    //Py_XDECREF(repr);
+    //Py_XDECREF(str);
 
-    //for (float f : gfoldData) {
-    //    std::cout << "From Python list: " << f << std::endl;
-    //}
 
-    //g++ src/edl.cpp src/orbits.cpp src/main.cpp -o main `python3 -m pybind11 --includes` `python3-config --ldflags` -std=c++17
+    PyRun_SimpleString("import sys; sys.path.append('./src/');");  // Import path to Python function
+
+    PyObject *numpy_module = PyImport_ImportModule("numpy");
+    PyObject *cvxpy_module = PyImport_ImportModule("cvxpy");
+    PyObject* pModule = PyImport_ImportModule("gfoldSolver");
+    PyObject* pFunc = PyObject_GetAttrString(pModule, "solveGfoldOptim");
+    
+    PyObject* pArgs = PyTuple_Pack(1, pyList);
+    PyObject* returnedList = PyObject_CallObject(pFunc, pArgs);
+
+    // Convert PyObject to a string representation
+    //cout << "\n";
+    //cout << "Returned list: " << "\n";
+    //PyObject* repr = PyObject_Repr(returnedList);  // Get the string representation
+    //PyObject* str = PyUnicode_AsEncodedString(repr, "utf-8", "~E~");  // Encode to UTF-8
+    //const char* bytes = PyBytes_AS_STRING(str);  // Extract C string
+    //cout << bytes << endl;
+    //Py_XDECREF(repr);
+    //Py_XDECREF(str);
+    
+    Py_ssize_t size = PyList_Size(returnedList);
+    std::vector<float> gfoldDataVec;
+    gfoldDataVec.reserve(size);
+    
+    for (Py_ssize_t i = 0; i < size; ++i) {
+        PyObject* item = PyList_GetItem(returnedList, i);
+        gfoldDataVec.push_back(PyFloat_AsDouble(item));
+    }
+   
+
+    Py_DECREF(pArgs);
+    Py_DECREF(returnedList);
+    Py_DECREF(pFunc);
+    Py_DECREF(pyList);
+    Py_DECREF(pModule);
+
+    Py_Finalize();
+
+    //cout << "Returned GFOLD Data:" << "\n";
+    //cout << gfoldDataVec;
+    
+    // Copy data into arrays for each variable
+    int N = (int) tf/GFOLD_DT;
+    cout << "\n" << "Number of elements: " << N << endl;
+    float status_flag = gfoldDataVec[0];
+    float rx[N];
+    float ry[N];
+    float rz[N];
+    float vx[N];
+    float vy[N];
+    float vz[N];
+    float m[N];
+    float Tx[N];
+    float Ty[N];
+    float Tz[N];
+    float pd_time[N];
+    for (int i = 0; i < N; ++i) {
+        rx[i] = gfoldDataVec[i+1];
+        ry[i] = gfoldDataVec[N+1 + i+1];
+        rz[i] = gfoldDataVec[2*N+2 + i+1];
+        vx[i] = gfoldDataVec[3*N+3 + i+1];
+        vy[i] = gfoldDataVec[4*N+4 + i+1];
+        vz[i] = gfoldDataVec[5*N+5 + i+1];
+        m[i] = exp(gfoldDataVec[6*N+6 + i+1]);
+        Tx[i] = gfoldDataVec[7*N+7 + i+1]*m[i];
+        Ty[i] = gfoldDataVec[8*N+8 + i+1]*m[i];
+        Tz[i] = gfoldDataVec[9*N+9 + i+1]*m[i];
+        if (i >= 1) {
+            globalTime = globalTime + GFOLD_DT;
+        }
+        pd_time[i] = globalTime;
+    }
+
+    // Log the data to a .csv file
+    std::ofstream poweredDescentFile;
+    poweredDescentFile.open("results/pd.csv"); // time, rx, ry, rz, vx, vy, vz, m, Tx, Ty, Tz
+    for (int i = 0; i < N; ++i) {
+        poweredDescentFile << pd_time[i] << ","
+                       << rx[i] << ","
+                       << ry[i] << ","
+                       << rz[i] << ","
+                       << vx[i] << ","
+                       << vy[i] << ","
+                       << vz[i] << ","
+                       << m[i] << ","
+                       << Tx[i] << ","
+                       << Ty[i] << ","
+                       << Tz[i] << ","
+                       << "\n";
+    }
+
+    cout << "G-FOLD Status Flag (1 if Optimal, 0 if Not): " << status_flag << "\n";
+    cout << "State at End of Powered Descent: \n";
+    cout << rx[N] << "," << ry[N] << "," << rz[N] << "," << vx[N] << "," << vy[N] << "," << vz[N];
+
+    poweredDescentFile.close();
+
     return 0;
 }
