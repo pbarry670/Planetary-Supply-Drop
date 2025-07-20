@@ -532,18 +532,8 @@ int main(){
     for (int i = 0; i < passedValsSize; ++i) {
         PyList_SetItem(pyList, i, PyFloat_FromDouble(passedVals[i]));
     }
-    //cout << "\n";
-    //cout << "Passed Args: " << "\n";
-    // Convert PyObject to a string representation
-    //PyObject* repr = PyObject_Repr(pyList);  // Get the string representation
-    //PyObject* str = PyUnicode_AsEncodedString(repr, "utf-8", "~E~");  // Encode to UTF-8
-    //const char* bytes = PyBytes_AS_STRING(str);  // Extract C string
-    //cout << bytes << endl;
-    //Py_XDECREF(repr);
-    //Py_XDECREF(str);
 
-
-    PyRun_SimpleString("import sys; sys.path.append('./src/');");  // Import path to Python function
+    PyRun_SimpleString("import sys; sys.path.append('../Python/');");  // Import path to Python function
 
     PyObject *numpy_module = PyImport_ImportModule("numpy");
     PyObject *cvxpy_module = PyImport_ImportModule("cvxpy");
@@ -553,16 +543,6 @@ int main(){
     PyObject* pArgs = PyTuple_Pack(1, pyList);
     PyObject* returnedList = PyObject_CallObject(pFunc, pArgs);
 
-    // Convert PyObject to a string representation
-    //cout << "\n";
-    //cout << "Returned list: " << "\n";
-    //PyObject* repr = PyObject_Repr(returnedList);  // Get the string representation
-    //PyObject* str = PyUnicode_AsEncodedString(repr, "utf-8", "~E~");  // Encode to UTF-8
-    //const char* bytes = PyBytes_AS_STRING(str);  // Extract C string
-    //cout << bytes << endl;
-    //Py_XDECREF(repr);
-    //Py_XDECREF(str);
-    
     Py_ssize_t size = PyList_Size(returnedList);
     std::vector<float> gfoldDataVec;
     gfoldDataVec.reserve(size);
@@ -581,35 +561,34 @@ int main(){
 
     Py_Finalize();
 
-    //cout << "Returned GFOLD Data:" << "\n";
-    //cout << gfoldDataVec;
     
     // Copy data into arrays for each variable
-    int N = (int) tf/GFOLD_DT;
-    cout << "\n" << "Number of elements: " << N << endl;
+    std::size_t numGfoldDatapts = gfoldDataVec.size();
+    int numTrajPts = (numGfoldDatapts-1)/10;
     float status_flag = gfoldDataVec[0];
-    float rx[N];
-    float ry[N];
-    float rz[N];
-    float vx[N];
-    float vy[N];
-    float vz[N];
-    float m[N];
-    float Tx[N];
-    float Ty[N];
-    float Tz[N];
-    float pd_time[N];
-    for (int i = 0; i < N; ++i) {
+    float rx[numTrajPts];
+    float ry[numTrajPts];
+    float rz[numTrajPts];
+    float vx[numTrajPts];
+    float vy[numTrajPts];
+    float vz[numTrajPts];
+    float m[numTrajPts];
+    float Tx[numTrajPts];
+    float Ty[numTrajPts];
+    float Tz[numTrajPts];
+    float pd_time[numTrajPts];
+    for (int i = 0; i < numTrajPts; ++i) {
         rx[i] = gfoldDataVec[i+1];
-        ry[i] = gfoldDataVec[N+1 + i+1];
-        rz[i] = gfoldDataVec[2*N+2 + i+1];
-        vx[i] = gfoldDataVec[3*N+3 + i+1];
-        vy[i] = gfoldDataVec[4*N+4 + i+1];
-        vz[i] = gfoldDataVec[5*N+5 + i+1];
-        m[i] = exp(gfoldDataVec[6*N+6 + i+1]);
-        Tx[i] = gfoldDataVec[7*N+7 + i+1]*m[i];
-        Ty[i] = gfoldDataVec[8*N+8 + i+1]*m[i];
-        Tz[i] = gfoldDataVec[9*N+9 + i+1]*m[i];
+        ry[i] = gfoldDataVec[i+1 + 1*numTrajPts];
+        rz[i] = gfoldDataVec[i+1 + 2*numTrajPts];
+        vx[i] = gfoldDataVec[i+1 + 3*numTrajPts];
+        vy[i] = gfoldDataVec[i+1 + 4*numTrajPts];
+        vz[i] = gfoldDataVec[i+1 + 5*numTrajPts];
+        m[i] = exp(gfoldDataVec[i+1 + 6*numTrajPts]);
+        Tx[i] = gfoldDataVec[i+1 + 7*numTrajPts]*m[i];
+        Ty[i] = gfoldDataVec[i+1 + 8*numTrajPts]*m[i];
+        Tz[i] = gfoldDataVec[i+1 + 9*numTrajPts]*m[i];
+
         if (i >= 1) {
             globalTime = globalTime + GFOLD_DT;
         }
@@ -619,7 +598,7 @@ int main(){
     // Log the data to a .csv file
     std::ofstream poweredDescentFile;
     poweredDescentFile.open("results/pd.csv"); // time, rx, ry, rz, vx, vy, vz, m, Tx, Ty, Tz
-    for (int i = 0; i < N; ++i) {
+    for (int i = 0; i < numTrajPts; ++i) {
         poweredDescentFile << pd_time[i] << ","
                        << rx[i] << ","
                        << ry[i] << ","
@@ -632,13 +611,17 @@ int main(){
                        << Ty[i] << ","
                        << Tz[i] << ","
                        << "\n";
+
+        if (i == numTrajPts-1) {
+            cout << "Lander Final State: " << rx[i] << "," << ry[i] << "," << rz[i] << "," << vx[i] << "," << vy[i] << "," << vz[i];
+        }
     }
 
-    cout << "G-FOLD Status Flag (1 if Optimal, 0 if Not): " << status_flag << "\n";
-    cout << "State at End of Powered Descent: \n";
-    cout << rx[N] << "," << ry[N] << "," << rz[N] << "," << vx[N] << "," << vy[N] << "," << vz[N];
-
     poweredDescentFile.close();
+
+    cout << "\n";
+    cout << "G-FOLD Status Flag (1 if Optimal, 0 if Not): " << status_flag << "\n";
+    cout << "Landed!";
 
     return 0;
 }
