@@ -47,6 +47,7 @@ positions[:, 1] = positions[:, 1] - positions[-1, 1]
 scene = canvas(title="Ballistic Descent, Local Level View", width=1000, height=400, background=color.cyan)
 scene.lights = []
 distant_light(canvas=scene, direction=vector(0,0,1), color=vector(0.9,0.9,0.9))
+distant_light(canvas=scene, direction=vector(0,0,-1), color=vector(0.9,0.9,0.9))
 capx, capy = LL_2_VPython(positions[0, 0], positions[0,1])
 capsule_b = sphere(canvas=scene, pos=vector(capx, capy, 0), radius=20000, shininess=0, color=color.blue, make_trail=True, trail_color=color.blue)
 target_b = sphere(canvas=scene, pos=vector(0, 0, 0), radius=50000, shininess=0, color=color.red)

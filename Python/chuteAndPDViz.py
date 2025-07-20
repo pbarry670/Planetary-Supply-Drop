@@ -21,12 +21,13 @@ vzs = np.array(df_c[5])
 pzs = np.array(df_c[6])
 
 # Set up chute descent local-level canvas
-cdCanvas = canvas(title="Chute Descent, Local Level View", width=300, height=300, background=color.cyan)
-cdTopCanvas = canvas(title="Chute Descent, Birds' Eye View", width=300, height=300, background=color.cyan)
+cdCanvas = canvas(title="Chute Descent, Local Level View", width=300, height=300, background=color.white)
+cdTopCanvas = canvas(title="Chute Descent, Birds' Eye View", width=300, height=300, background=color.white)
 
 # Set up chute descent local-level canvas
 cdCanvas.lights = []
 distant_light(canvas=cdCanvas, direction=vector(0,0,1), color=vector(0.9,0.9,0.9))
+distant_light(canvas=cdCanvas, direction=vector(0,0,-1), color=vector(0.9,0.9,0.9))
 capx, capy = LL_2_VPython(pxs[0], pys[0])
 capsule_c = sphere(canvas=cdCanvas, pos=vector(capx, capy, pzs[0]), radius=100, shininess=0, color=color.blue, make_trail=True, trail_radius=50)
 target_c = sphere(canvas=cdCanvas, pos=vector(0,0,0), radius=50, color=color.red)
