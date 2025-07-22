@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 from vpython import canvas, sphere, color, vector, distant_light, rate
 import time
-#TODO: Once powered descent data is available, concatenate it to the chute descent data and merge it into the visualization.
 
 def LL_2_VPython(x, y):
     

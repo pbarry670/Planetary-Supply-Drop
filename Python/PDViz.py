@@ -51,9 +51,6 @@ xpos.plot(ts_p[0], pxs[0])
 ypos.plot(ts_p[0], pys[0])
 zpos.plot(ts_p[0], pzs[0])
 
-print(vxs[0])
-print(vys[0])
-print(vzs[0])
 # Set up velocity graph
 velGraph = graph(title = 'Lander Velocity', xtitle='Global Time (s)', ytitle='Velocity (m)', ymax=50, ymin=-50)
 xvel = gcurve(graph=velGraph, color=color.blue)
