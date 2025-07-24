@@ -31,17 +31,25 @@ def solveGfoldOptim(passedVals):
     tf = passedVals[18]
     dt = passedVals[19]
 
+    status_flag = 1
     status, miss_dist, traj_hist, z_hist, u_hist = solve_p3(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, Vmax, g_mag, tf, dt)
+    print(f"Problem 3 Status: '{status}'")
+    if "optimal" not in status:
+        print("Problem 3 solution not found. Consider relaxing powered descent constraints.")
+        status_flag = 0
+        return [status_flag, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+
     d_p3star = traj_hist[-1, 1:3] # Last index is exclusive
     status, final_z, traj_hist, z_hist, u_hist = solve_p4(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, Vmax, g_mag, tf, dt, d_p3star)
-
-    # Now, need to return the solved trajectory and its parameters to the C++ function calling this.
-    status_flag = 0
-    if "optimal" in status:
-        status_flag = 1
+    print(f"Problem 4 Status: '{status}'")
+    if "optimal" not in status:
+        print("Problem 4 solution not found. Consider relaxing powered descent constraints.")
+        status_flag = 0
+        return [status_flag, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 
     numel_z = z_hist.size
 
+    print("Synthesizing trajectory optimization results...")
     rx_hist = traj_hist[:,0]
     ry_hist = traj_hist[:,1]
     rz_hist = traj_hist[:,2]
@@ -151,7 +159,9 @@ def solve_p3(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, V
 
     # Solve the problem
     p3 = cp.Problem(cp.Minimize(objective), constraints)
-    p3.solve(verbose=True)
+    print("Solving minimum landing error problem (P3)...")
+    p3.solve(verbose=False)
+
 
     status = p3.status
     miss_dist = p3.value
@@ -246,7 +256,8 @@ def solve_p4(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, V
 
     # Solve the problem
     p4 = cp.Problem(cp.Maximize(objective), constraints)
-    p4.solve(verbose=True)
+    print("Solving the minimum fuel problem (P4)...")
+    p4.solve(verbose=False)
 
     status = p4.status
     final_z = p4.value

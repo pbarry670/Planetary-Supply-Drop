@@ -82,7 +82,8 @@ def solve_p3(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, V
 
     # Solve the problem
     p3 = cp.Problem(cp.Minimize(objective), constraints)
-    p3.solve(verbose=True)
+    print("Solving minimum landing error problem (P3)...")
+    p3.solve(verbose=False)
 
     status = p3.status
     miss_dist = p3.value
@@ -177,7 +178,8 @@ def solve_p4(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, V
 
     # Solve the problem
     p4 = cp.Problem(cp.Maximize(objective), constraints)
-    p4.solve(verbose=True)
+    print("Solving the minimum fuel problem (P4)...")
+    p4.solve(verbose=False)
 
     status = p4.status
     final_z = p4.value
@@ -210,20 +212,20 @@ if __name__ == "__main__":
     tf = 75.0
     dt = 0.5
 
+    status_flag = 1
     status, miss_dist, traj_hist, z_hist, u_hist = solve_p3(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, Vmax, g_mag, tf, dt)
-    print(status)
-    print(miss_dist)
-    print(traj_hist[-1, 1])
-    print(traj_hist[-1, 2])
+    print(f"Problem 3 Status: '{status}'")
+    if "optimal" not in status:
+        print("Problem 3 solution not found. Consider relaxing powered descent constraints.")
+        status_flag = 0
 
     d_p3star = traj_hist[-1, 1:3] # Last index is exclusive
 
     status, final_z, traj_hist, z_hist, u_hist = solve_p4(state0, n_T, m_wet, m_fuel, T_min, T_max, alpha, gamma_gs, theta, Vmax, g_mag, tf, dt, d_p3star)
-    print(status)
-    status_flag = 0
-    if "optimal" in status:
-        status_flag = 1
-
+    print(f"Problem 4 Status: '{status}'")
+    if "optimal" not in status:
+        print("Problem 4 solution not found. Consider relaxing powered descent constraints.")
+        status_flag = 0
 
     time = np.linspace(0, int(tf), int(tf/dt)+1)
 
