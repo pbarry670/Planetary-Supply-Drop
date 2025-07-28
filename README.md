@@ -2,18 +2,19 @@
 This repository serves as a toolset for the concept of a "planetary supply drop," or the notion that some payload in orbit can be delivered to any specified location on Earth. This idea is advantageous because the time it takes an object to reach sea level from a 500 km altitude orbit around Earth is typically between 15-25 minutes, depending on the entry, descent, and landing system employed and its associated parameters. For such an idea to be brought to fruition, it is necessary to draw from a body of knowledge consisting of launch vehicle dynamics, orbital mechanics, control theory, ballistic entry physics, reference frames, and trajectory optimization - as well as implementing  all of these big ideas in code! 
 
 The repository is divided into a handful of folders. First, the MATLAB folder contains some algorithm development code used to quickly prototype ideas and implementations. This is done before translation into C++, the folder for which contains the primary executable, main.exe, as well as header and source files for all associated C++ code. The data collected during simulation is written into .csv files, which is why the Python folder exists: Python's vpython library is leveraged to create animations to link a visual representation to the math being carried out. The Python folder also contains code that carries out the Guidance for Fuel-Optimal Large Diverts (G-FOLD) algorithm, which requires solving a convex optimization problem. This, however, is called by and returns data to the C++ code, keeping all execution within one file: main.exe.
-
+<p align="center">
 <img width="361" height="308" alt="image" src="https://github.com/user-attachments/assets/4b243c4c-d25e-4388-a8a1-23cfb6da29f3" />
-<img width="478" height="422" alt="image" src="https://github.com/user-attachments/assets/0583c675-a954-4b27-81af-c7b07a659cbc" />
+<img width="361" height="308" alt="image" src="https://github.com/user-attachments/assets/0583c675-a954-4b27-81af-c7b07a659cbc" />
+</p>
 
 
-
-<img width="1340" height="299" alt="image" src="https://github.com/user-attachments/assets/9cf76346-92cb-46cc-a360-fb90508b46c9" />
-
-<img width="354" height="495" alt="image" src="https://github.com/user-attachments/assets/34679b89-ab01-4c02-911d-661399765ad5" />
-
-<img width="605" height="642" alt="image" src="https://github.com/user-attachments/assets/199407d7-e83e-4c72-8769-706742f01a06" />
-
+<p align="center">
+<img width="900" height="299" alt="image" src="https://github.com/user-attachments/assets/9cf76346-92cb-46cc-a360-fb90508b46c9" />
+</p>
+<p align="center">
+<img width="400" height="400" alt="image" src="https://github.com/user-attachments/assets/34679b89-ab01-4c02-911d-661399765ad5" />
+<img width="400" height="400" alt="image" src="https://github.com/user-attachments/assets/199407d7-e83e-4c72-8769-706742f01a06" />
+</p>
 
 
 ## Running The Code
