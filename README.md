@@ -95,6 +95,7 @@ Ballistic descent is performed by propagating three states: speed, flight path a
 <img width="300" height="200" alt="image" src="https://github.com/user-attachments/assets/0a2e4b21-b2ff-496b-9aa9-65940f3ed24c" />
 <img width="300" height="200" alt="image" src="https://github.com/user-attachments/assets/b4324dc2-22dd-4741-b127-1360734d9882" />
 </p>
+
 #### Chute Descent
 At the beginning of chute descent, the mass of the capsule has the mass of the heatshield subtracted from it. A simple drag model is utilized for the parachute, where the upward force provided is proportional to air density, drag coefficient, and speed squared. Wind and other perturbations are modeled as perturbing cross-range accelerations, represented as random variables centered around some nonzero mean. From the capsule deployment calculation in the orbit, the ballistic descent is assumed to end with the capsule directly above the drop point. These perturbing accelerations introduce cross-range error, resulting in the need for powered descent to correct these errors to land exactly at the drop point.
 <p align="center">
