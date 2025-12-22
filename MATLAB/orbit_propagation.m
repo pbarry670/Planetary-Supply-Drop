@@ -3,6 +3,38 @@ clear; clc; close all
 set(0, 'DefaultFigureWindowStyle','docked')
 set(0, 'DefaultLineLineWidth', 2);
 
+%% Ground Station Parameters
+
+groundStationTable = readtable('../GroundStations.csv');
+groundStationCell = table2cell(groundStationTable);
+[r,c] = size(groundStationTable);
+
+groundStations = struct();
+figure(9); clf
+[X,Y,Z] = ellipsoid(0,0,0,6378*1000,6378*1000,6378*1000);
+C = zeros(length(Z));
+surf(X,Y,Z, C)
+
+for i = 1:r
+    groundStations(i).name = groundStationCell{i,1};
+    groundStations(i).lat = groundStationCell{i,2};
+    groundStations(i).lon = groundStationCell{i,3};
+    groundStations(i).alt = groundStationCell{i,4};
+    groundStations(i).rangeAcc = groundStationCell{i,5};
+    groundStations(i).rangeRateAcc = groundStationCell{i,6};
+    groundStations(i).r_ECEF = compute_ECEF_from_LLA(groundStations(i).lat, ...
+        groundStations(i).lon, groundStations(i).alt);
+    groundStations(i).r_ECI = groundStations(i).r_ECEF;
+    groundStations(i).visibilityConeAngle = groundStationCell{i,7};
+    groundStations(i).isObserving = false;
+
+    hold on
+    scatter3(groundStations(i).r_ECEF(1), groundStations(i).r_ECEF(2), groundStations(i).r_ECEF(3),50, 'filled', 'k')
+end
+axis equal
+title('Ground Station Coverage', 'FontSize', 20)
+
+
 %% Satellite Orbit Parameters
 altitude_orbit = 500; % km
 r_orbit = altitude_orbit*1000 + 6378*1000; % m
@@ -61,6 +93,12 @@ alphas(1) = 0;
 xs_LLA(1) = compute_LLA(r_Sat);
 latlon_error(:, 1) = [desired_drop_location_lat; desired_drop_location_lon];
 
+%% Extended Sequential Filter Parameters
+
+xEstimate = x0_Sat; % initial state estimate
+PEstimate = diag([5 5 5 1 1 1]); % initial covariance matrix
+Q = diag([5 5 5 1 1 1]); % process noise matrix
+
 %% Controller Derivation
 % Controller acts in the LVLH frame, with states being the pos/vel relative
 % to the desired orbit. The desired orbit is integrated in tandem with the
@@ -97,11 +135,23 @@ K = lqr(A, B, Q, R);
 
 %% Simulation
 for i = 1:1:2*T_orbit
+
+    % KF Time Update Goes Here
+
+    % Update actual satellite state and reference satellite state based on dynamics
     [xE_next, xSatAct_next, xSatRef_next] = rk4_orbit_integ(xs_Earth(:,i), xs_SatAct(:,i), xs_SatRef(:, i), us_ECI(:,i), dt);
     xs_Earth(:,i+1) = xE_next;
     xs_SatAct(:,i+1) = xSatAct_next;
     xs_SatRef(:,i+1) = xSatRef_next;
 
+    % Update Ground Station Locations
+    % Check whether ground stations are currently observing satellite
+
+    % KF Measurement Update Goes Here - if no measurements available, state
+    % prediction is taken.
+
+    % Determine control action - TODO based on state estimate instead of
+    % actual state of actual satellite
     [aRef, eRef, iRef, ORef, TRef] = rv_to_elements(xs_SatRef(1:3, i+1), xs_SatRef(4:6, i+1), mu_Earth);
     dx_ECI = xs_SatAct(:,i+1) - xs_SatRef(:, i+1);
     R_ECI_2_LVLH = compute_rotation_ECI_2_LVLH(iRef, ORef, TRef);
