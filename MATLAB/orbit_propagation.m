@@ -24,8 +24,8 @@ for i = 1:r
     groundStations(i).rangeRateAcc = groundStationCell{i,6};
     groundStations(i).r_ECEF = compute_ECEF_from_LLA(groundStations(i).lat, ...
         groundStations(i).lon, groundStations(i).alt);
-    groundStations(i).r_ECI = groundStations(i).r_ECEF;
-    groundStations(i).visibilityConeAngle = groundStationCell{i,7};
+    groundStations(i).r_ECI = groundStations(i).r_ECEF; % ECI aligned with ECEF at start
+    groundStations(i).visibilityConeAngle = 100; %groundStationCell{i,7};
     groundStations(i).isObserving = false;
 
     hold on
@@ -93,11 +93,19 @@ alphas(1) = 0;
 xs_LLA(1) = compute_LLA(r_Sat);
 latlon_error(:, 1) = [desired_drop_location_lat; desired_drop_location_lon];
 
+xsEstimate = zeros(6, length(tspan));
+numsObservingStations = zeros(1, length(tspan));
+xs3Sigmas = zeros(6, length(tspan));
+
 %% Extended Sequential Filter Parameters
 
 xEstimate = x0_Sat; % initial state estimate
 PEstimate = diag([5 5 5 1 1 1]); % initial covariance matrix
-Q = diag([5 5 5 1 1 1]); % process noise matrix
+Q = diag([1 1 1 0.5 0.5 0.5]); % process noise matrix
+observationChancePerSecond = 0.2;
+
+xsEstimate(:,1) = xEstimate;
+xs3Sigmas(:,1) = 3*sqrt(diag(PEstimate));
 
 %% Controller Derivation
 % Controller acts in the LVLH frame, with states being the pos/vel relative
@@ -131,12 +139,12 @@ R = [1 0 0;
 
 K = lqr(A, B, Q, R);
 
-
-
 %% Simulation
+
 for i = 1:1:2*T_orbit
 
-    % KF Time Update Goes Here
+    % KF Time Update
+    [xPrior, PPrior] = time_update(xEstimate, PEstimate, Q, mu_Earth, dt);
 
     % Update actual satellite state and reference satellite state based on dynamics
     [xE_next, xSatAct_next, xSatRef_next] = rk4_orbit_integ(xs_Earth(:,i), xs_SatAct(:,i), xs_SatRef(:, i), us_ECI(:,i), dt);
@@ -145,10 +153,22 @@ for i = 1:1:2*T_orbit
     xs_SatRef(:,i+1) = xSatRef_next;
 
     % Update Ground Station Locations
-    % Check whether ground stations are currently observing satellite
+    groundStations = update_ground_station_locations(groundStations, alpha);
 
+    % Check whether ground stations are currently observing satellite
+    [groundStations, N_observing] = update_ground_station_observability(groundStations, xs_SatAct(:,i+1));
+    numsObservingStations(i) = N_observing;
     % KF Measurement Update Goes Here - if no measurements available, state
-    % prediction is taken.
+    % prediction is taken in the update
+    if N_observing > 0 && rand <= observationChancePerSecond
+        Y = getMeasurement(xs_SatAct(:,i+1), groundStations, we, N_observing); % get simulated measurement
+        [xEstimate, PEstimate] = measurement_update(xPrior, PPrior, Y, groundStations, we, N_observing);
+    else
+        xEstimate = xPrior;
+        PEstimate = PPrior;
+    end
+    xsEstimate(:, i+1) = xEstimate;
+    xs3Sigmas(:, i+1) = 3*sqrt(diag(PEstimate));
 
     % Determine control action - TODO based on state estimate instead of
     % actual state of actual satellite
@@ -196,6 +216,12 @@ DeltaVRef = vDesiredRef - vCurrentRef;
 xs_SatAct(4:6, seconds_iterated+1) = vCurrentAct + DeltaVAct;
 xs_SatRef(4:6, seconds_iterated+1) = vCurrentRef + DeltaVRef;
 
+% Update estimates
+xsEstimate(1:3, seconds_iterated+1) = xEstimate(1:3);
+xsEstimate(4:6, seconds_iterated+1) = xsEstimate(4:6, seconds_iterated) + DeltaVAct;
+xs3Sigmas(:, seconds_iterated+1) = xs3Sigmas(:, seconds_iterated);
+numsObservingStations(seconds_iterated+1) = numsObservingStations(seconds_iterated);
+
 % Parameters to determine drop point
 hasOrbitedOnce = false;
 hasOrbitedTwice = false;
@@ -218,10 +244,26 @@ timeToLand = ceil(992.6651); % comes from EDL script
 
 next_start_t = seconds_iterated + 1;
 for i = next_start_t:1:(length(tspan)-1)
+
+    [xPrior, PPrior] = time_update(xEstimate, PEstimate, Q, mu_Earth, dt);
+
     [xE_next, xSatAct_next, xSatRef_next] = rk4_orbit_integ(xs_Earth(:,i), xs_SatAct(:,i), xs_SatRef(:, i), us_ECI(:,i), dt);
     xs_Earth(:,i+1) = xE_next;
     xs_SatAct(:,i+1) = xSatAct_next;
     xs_SatRef(:,i+1) = xSatRef_next;
+
+    groundStations = update_ground_station_locations(groundStations, alpha);
+    [groundStations, N_observing] = update_ground_station_observability(groundStations, xs_SatAct(:,i+1));
+    numsObservingStations(i) = N_observing;
+    if N_observing > 0 && rand <= observationChancePerSecond
+        Y = getMeasurement(xs_SatAct(:,i+1), groundStations, we, N_observing); % get simulated measurement
+        [xEstimate, PEstimate] = measurement_update(xPrior, PPrior, Y, groundStations, we, N_observing);
+    else
+        xEstimate = xPrior;
+        PEstimate = PPrior;
+    end
+    xsEstimate(:, i+1) = xEstimate;
+    xs3Sigmas(:, i+1) = 3*sqrt(diag(PEstimate));
 
     [aRef, eRef, iRef, ORef, TRef] = rv_to_elements(xs_SatRef(1:3, i+1), xs_SatRef(4:6, i+1), mu_Earth);
     dx_ECI = xs_SatAct(:,i+1) - xs_SatRef(:, i+1);
@@ -373,6 +415,7 @@ ylabel('ECEF Position', 'FontSize', 15)
 title('Satellite Latitude and Longitude Over Time', 'FontSize', 15)
 legend('Latitude', 'Longitude', 'FontSize', 13, 'Location', 'best')
 
+% Latitude and Longitude Offset from Target
 figure(8); clf
 plot(tspan, latlon_error(1,:))
 hold on
@@ -381,6 +424,103 @@ xlabel('Time (s)', 'FontSize', 15)
 ylabel('Geodetic Error (deg)', 'FontSize', 15)
 title('Satellite Latitude and Longitude Error Over Time', 'FontSize', 15)
 legend('Latitude Error', 'Longitude Error', 'FontSize', 13, 'Location', 'best')
+
+% Estimated Orbit Compared with Actual Orbit
+figure(10); clf
+plot3(xs_SatAct(1,:), xs_SatAct(2,:), xs_SatAct(3,:));
+hold on
+plot3(xsEstimate(1,:), xsEstimate(2,:), xsEstimate(3,:));
+plot3(0,0,0, 'o', 'Color', 'k', 'MarkerSize', 10, 'MarkerFaceColor', 'g')
+xlabel('X Position (m)', 'FontSize', 15)
+ylabel('Y Position (m)', 'FontSize', 15)
+zlabel('Z Position (m)', 'FontSize', 15)
+legend('Actual Orbit', 'Estimated Orbit', 'Earth', 'Location', 'best')
+title('Orbit Determination Accuracy', 'FontSize', 15)
+axis equal
+
+% Pos Estimation Error
+figure(11); clf
+plot(tspan, vecnorm(xsEstimate(1:3, :) - xs_SatAct(1:3, :)))
+xlabel('Time (s)', 'FontSize', 15)
+ylabel('Position Estimation Error', 'FontSize', 15)
+title('Position Estimation Error', 'FontSize', 15)
+
+% Vel Estimation Error
+figure(12); clf
+plot(tspan, vecnorm(xsEstimate(4:6, :) - xs_SatAct(4:6, :)))
+xlabel('Time (s)', 'FontSize', 15)
+ylabel('Speed Estimation Error', 'FontSize', 15)
+title('Velocity Estimation Error', 'FontSize', 15)
+
+% Number of Available Ground Stations
+figure(13); clf
+plot(tspan, numsObservingStations)
+xlabel('Time (s)', 'FontSize', 15)
+ylabel('Number of Observing Ground Stations', 'FontSize', 15)
+title('Ground Station Observability', 'FontSize', 15)
+
+% 3-Sigma Plots for Pos/Vel
+figure(14); clf
+plot(tspan, xs3Sigmas(1,:), 'k-', 'LineWidth', 3)
+hold on
+plot(tspan, -xs3Sigmas(1,:), 'k-', 'LineWidth', 3)
+plot(tspan, xsEstimate(1,:) - xs_SatAct(1,:))
+legend('Upper 3-Sigma Bound', 'Lower 3-Sigma Bound', 'X-Position Error', 'FontSize', 15)
+xlabel('Time (s)', 'FontSize', 15)
+ylabel('Position Error (m)', 'FontSize', 15)
+title('X Position Uncertainty', 'FontSize', 15)
+
+figure(15); clf
+plot(tspan, xs3Sigmas(2,:), 'k-', 'LineWidth', 3)
+hold on
+plot(tspan, -xs3Sigmas(2,:), 'k-', 'LineWidth', 3)
+plot(tspan, xsEstimate(2,:) - xs_SatAct(2,:))
+legend('Upper 3-Sigma Bound', 'Lower 3-Sigma Bound', 'Y-Position Error', 'FontSize', 15)
+xlabel('Time (s)', 'FontSize', 15)
+ylabel('Position Error (m)', 'FontSize', 15)
+title('Y Position Uncertainty', 'FontSize', 15)
+
+figure(16); clf
+plot(tspan, xs3Sigmas(3,:), 'k-', 'LineWidth', 3)
+hold on
+plot(tspan, -xs3Sigmas(3,:), 'k-', 'LineWidth', 3)
+plot(tspan, xsEstimate(3,:) - xs_SatAct(3,:))
+legend('Upper 3-Sigma Bound', 'Lower 3-Sigma Bound', 'Z-Position Error', 'FontSize', 15)
+xlabel('Time (s)', 'FontSize', 15)
+ylabel('Position Error (m)', 'FontSize', 15)
+title('Z Position Uncertainty', 'FontSize', 15)
+
+figure(17); clf
+plot(tspan, xs3Sigmas(4,:), 'k-', 'LineWidth', 3)
+hold on
+plot(tspan, -xs3Sigmas(4,:), 'k-', 'LineWidth', 3)
+plot(tspan, xsEstimate(4,:) - xs_SatAct(4,:))
+legend('Upper 3-Sigma Bound', 'Lower 3-Sigma Bound', 'X-Velocity Error', 'FontSize', 15)
+xlabel('Time (s)', 'FontSize', 15)
+ylabel('Velocity Error (m)', 'FontSize', 15)
+title('X Velocity Uncertainty', 'FontSize', 15)
+
+figure(18); clf
+plot(tspan, xs3Sigmas(5,:), 'k-', 'LineWidth', 3)
+hold on
+plot(tspan, -xs3Sigmas(5,:), 'k-', 'LineWidth', 3)
+plot(tspan, xsEstimate(5,:) - xs_SatAct(5,:))
+legend('Upper 3-Sigma Bound', 'Lower 3-Sigma Bound', 'Y-Velocity Error', 'FontSize', 15)
+xlabel('Time (s)', 'FontSize', 15)
+ylabel('Velocity Error (m)', 'FontSize', 15)
+title('Y Velocity Uncertainty', 'FontSize', 15)
+
+figure(19); clf
+plot(tspan, xs3Sigmas(6,:), 'k-', 'LineWidth', 3)
+hold on
+plot(tspan, -xs3Sigmas(6,:), 'k-', 'LineWidth', 3)
+plot(tspan, xsEstimate(6,:) - xs_SatAct(6,:))
+legend('Upper 3-Sigma Bound', 'Lower 3-Sigma Bound', 'Z-Velocity Error', 'FontSize', 15)
+xlabel('Time (s)', 'FontSize', 15)
+ylabel('Velocity Error (m)', 'FontSize', 15)
+title('Z Velocity Uncertainty', 'FontSize', 15)
+
+
 
 function[xdot]= Earth_actual_orbit_prop(x, u, r_S2E)
 
@@ -649,4 +789,158 @@ function [r_ECEF] = compute_ECEF_from_LLA(lat, lon, alt)
     z = (6378*1000 + alt)*sin(lat);
 
     r_ECEF = [x; y; z];
+end
+
+function[xPrior, PPrior]= time_update(xEstimate, PEstimate, Q, mu, dt)
+
+    r = norm(xEstimate(1:3));
+    x = xEstimate(1);
+    y = xEstimate(2);
+    z = xEstimate(3);
+
+    A = [0, 0, 0, 1, 0, 0;
+         0, 0, 0, 0, 1, 0;
+         0, 0, 0, 0, 0, 1;
+         -mu/r^3 + (3*mu*x^2)/(r^5), (3*mu*x*y)/(r^5), (3*mu*x*z)/(r^5), 0, 0, 0;
+         (3*mu*x*y)/(r^5), -mu/r^3 + (3*mu*y^2)/(r^5), (3*mu*y*z)/(r^5), 0, 0, 0;
+         (3*mu*x*z)/(r^5), (3*mu*y*z)/(r^5), -mu/r^3 + (3*mu*z^2)/(r^5), 0, 0, 0];
+
+    Phi = eye(6) + A*dt + (1/2)*A*A*(dt^2) + (1/6)*A*A*A*(dt^3) + (1/24)*A*A*A*A*(dt^4);
+
+    %xPrior = xEstimate + dt*Earth_reference_orbit_prop(xEstimate);
+    k1_xEstimate = Earth_reference_orbit_prop(xEstimate);
+    k2_xEstimate = Earth_reference_orbit_prop(xEstimate + k1_xEstimate*(dt/2));
+    k3_xEstimate = Earth_reference_orbit_prop(xEstimate + k2_xEstimate*(dt/2));
+    k4_xEstimate = Earth_reference_orbit_prop(xEstimate + k3_xEstimate*dt);
+    xPrior = xEstimate + dt*((1/6)*k1_xEstimate + (1/3)*k2_xEstimate + (1/3)*k3_xEstimate + (1/6)*k4_xEstimate);
+
+    PPrior = Phi*PEstimate*Phi' + Q;
+
+end
+
+function [groundStations]= update_ground_station_locations(groundStations, alpha)
+
+    N = length(groundStations);
+    R_ECEF_2_ECI = compute_R_ECEF_2_ECI(alpha);
+    for i = 1:N
+        groundStations(i).r_ECI = R_ECEF_2_ECI*groundStations(i).r_ECEF;
+    end
+
+end
+
+function [groundStations, N_observing]= update_ground_station_observability(groundStations, xSat)
+
+    N = length(groundStations);
+    r_E2Sat = xSat(1:3);
+    N_observing = 0;
+
+    for i = 1:N
+        r_E2GS = groundStations(i).r_ECI;
+        r_GS2Sat = r_E2Sat - r_E2GS;
+
+        cos_theta_obs = dot(r_E2GS, r_GS2Sat)/(norm(r_E2GS)*norm(r_GS2Sat));
+        theta_obs = acosd(cos_theta_obs);
+
+        if theta_obs < groundStations(i).visibilityConeAngle
+            groundStations(i).isObserving = true;
+            N_observing = N_observing + 1;
+        else
+            groundStations(i).isObserving = false;
+        end
+
+    end
+
+end
+
+function [Y] = getMeasurement(xSat, groundStations, we, N_observing)
+
+    N = length(groundStations);
+
+    Y = zeros(2*N_observing, 1);
+    index = 1;
+
+    for i = 1:N
+        if groundStations(i).isObserving
+            station_r = groundStations(i).r_ECI;
+            station_v = cross([0;0;we], station_r);
+
+            rho_i = sqrt( (xSat(1) - station_r(1))^2 + (xSat(2) - station_r(2))^2 + (xSat(3) - station_r(3))^2 );
+            rhodot_i = ((xSat(1) - station_r(1))*(xSat(4) - station_v(1)) ...
+                + (xSat(2) - station_r(2))*(xSat(5) - station_v(2)) ...
+                + (xSat(3) - station_r(3))*(xSat(6) - station_v(3)))/rho_i;
+
+            Y(index) = rho_i + normrnd(0, groundStations(i).rangeAcc/2);
+            Y(index+1) = rhodot_i + normrnd(0, groundStations(i).rangeRateAcc/2);
+
+            index = index+2;
+        end
+    end
+
+end
+
+function [Y] = measurementModel(xSat, groundStations, we, N_observing)
+
+    N = length(groundStations);
+
+    Y = zeros(2*N_observing, 1);
+    index = 1;
+
+    for i=1:N
+        if groundStations(i).isObserving
+            station_r = groundStations(i).r_ECI;
+            station_v = cross([0;0;we], station_r);
+
+            rho_i = sqrt( (xSat(1) - station_r(1))^2 + (xSat(2) - station_r(2))^2 + (xSat(3) - station_r(3))^2 );
+            rhodot_i = ((xSat(1) - station_r(1))*(xSat(4) - station_v(1)) ...
+                + (xSat(2) - station_r(2))*(xSat(5) - station_v(2)) ...
+                + (xSat(3) - station_r(3))*(xSat(6) - station_v(3)))/rho_i;
+
+            Y(index) = rho_i;
+            Y(index+1) = rhodot_i;
+
+            index = index+2;
+        end
+    end
+
+end
+
+function [xEstimate, PEstimate]= measurement_update(xPrior, PPrior, Y, groundStations, we, N_observing)
+
+    y = Y - measurementModel(xPrior, groundStations, we, N_observing);
+    H = zeros(2*N_observing, 6);
+    R = zeros(2*N_observing, 2*N_observing);
+
+    rowIndex = 1;
+    N = length(groundStations);
+    for i = 1:N
+        if groundStations(i).isObserving
+            station_r = groundStations(i).r_ECI;
+            station_v = cross([0;0;we], station_r);
+
+            H(rowIndex, 1) = -(0.5000*(2*station_r(1) - 2*xPrior(1)))/((station_r(1) - xPrior(1))^2 + (station_r(2) - xPrior(2))^2 + (station_r(3) - xPrior(3))^2)^0.5000;
+            H(rowIndex, 2) = -(0.5000*(2*station_r(2) - 2*xPrior(2)))/((station_r(1) - xPrior(1))^2 + (station_r(2) - xPrior(2))^2 + (station_r(3) - xPrior(3))^2)^0.5000;
+            H(rowIndex, 3) = -(0.5000*(2*station_r(3) - 2*xPrior(3)))/((station_r(1) - xPrior(1))^2 + (station_r(2) - xPrior(2))^2 + (station_r(3) - xPrior(3))^2)^0.5000;
+            H(rowIndex, 4) = 0;
+            H(rowIndex, 5) = 0;
+            H(rowIndex, 6) = 0;
+            R(rowIndex, rowIndex) = groundStations(i).rangeAcc/2;
+
+            rowIndex = rowIndex + 1;
+
+            H(rowIndex, 1) = (0.5000*(2*station_r(1) - 2*xPrior(1))*((station_r(1) - xPrior(1))*(station_v(1) - xPrior(4)) + (station_r(2) - xPrior(2))*(station_v(2) - xPrior(5)) + (station_r(3) - xPrior(3))*(station_v(3) - xPrior(6))))/((station_r(1) - xPrior(1))^2 + (station_r(2) - xPrior(2))^2 + (station_r(3) - xPrior(3))^2)^1.5000 - (station_v(1) - xPrior(4))/((station_r(1) - xPrior(1))^2 + (station_r(2) - xPrior(2))^2 + (station_r(3) - xPrior(3))^2)^0.5000;
+            H(rowIndex, 2) = (0.5000*(2*station_r(2) - 2*xPrior(2))*((station_r(1) - xPrior(1))*(station_v(1) - xPrior(4)) + (station_r(2) - xPrior(2))*(station_v(2) - xPrior(5)) + (station_r(3) - xPrior(3))*(station_v(3) - xPrior(6))))/((station_r(1) - xPrior(1))^2 + (station_r(2) - xPrior(2))^2 + (station_r(3) - xPrior(3))^2)^1.5000 - (station_v(2) - xPrior(5))/((station_r(1) - xPrior(1))^2 + (station_r(2) - xPrior(2))^2 + (station_r(3) - xPrior(3))^2)^0.5000;
+            H(rowIndex, 3) = (0.5000*(2*station_r(3) - 2*xPrior(3))*((station_r(1) - xPrior(1))*(station_v(1) - xPrior(4)) + (station_r(2) - xPrior(2))*(station_v(2) - xPrior(5)) + (station_r(3) - xPrior(3))*(station_v(3) - xPrior(6))))/((station_r(1) - xPrior(1))^2 + (station_r(2) - xPrior(2))^2 + (station_r(3) - xPrior(3))^2)^1.5000 - (station_v(3) - xPrior(6))/((station_r(1) - xPrior(1))^2 + (station_r(2) - xPrior(2))^2 + (station_r(3) - xPrior(3))^2)^0.5000;
+            H(rowIndex, 4) = -(station_r(1) - xPrior(1))/((station_r(1) - xPrior(1))^2 + (station_r(2) - xPrior(2))^2 + (station_r(3) - xPrior(3))^2)^0.5000;
+            H(rowIndex, 5) = -(station_r(2) - xPrior(2))/((station_r(1) - xPrior(1))^2 + (station_r(2) - xPrior(2))^2 + (station_r(3) - xPrior(3))^2)^0.5000;
+            H(rowIndex, 6) = -(station_r(3) - xPrior(3))/((station_r(1) - xPrior(1))^2 + (station_r(2) - xPrior(2))^2 + (station_r(3) - xPrior(3))^2)^0.5000;
+            R(rowIndex, rowIndex) = groundStations(i).rangeRateAcc/2;
+
+            rowIndex = rowIndex + 1;
+        end
+    end
+
+    K = PPrior*H'*pinv(H*PPrior*H' + R);
+    xEstimate = xPrior + K*y;
+    PEstimate = (eye(6) - K*H)*PPrior*(eye(6) - K*H)' + K*R*K';
+
 end
