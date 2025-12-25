@@ -102,11 +102,11 @@ struct OrbitParams {
 };
 
 Eigen::Matrix<float,6,1> satelliteActualOrbitDynamics(ActualSatellite sat, Eigen::Matrix<float,6,1> x, Eigen::Vector3d u, Eigen::Vector3d r_S2E);
-Eigen::Matrix<float,6,1> satelliteReferenceOrbitDynamics(ReferenceSatellite sat, Eigen::Matrix<float,6,1> x);
+Eigen::Matrix<float,6,1> satelliteReferenceOrbitDynamics(Eigen::Matrix<float,6,1> x);
 Eigen::Matrix<float,6,1> earthOrbitDynamics(Eigen::Matrix<float,6,1> x);
 
 Eigen::Matrix<float,6,1> propagateActualSatellite(ActualSatellite sat, Eigen::Matrix<float,6,1> x, Eigen::Vector3d u, Eigen::Vector3d r_S2E);
-Eigen::Matrix<float,6,1> propagateReferenceSatellite(ReferenceSatellite sat, Eigen::Matrix<float,6,1> x);
+Eigen::Matrix<float,6,1> propagateReferenceSatellite(Eigen::Matrix<float,6,1> x);
 Eigen::Matrix<float,6,1> propagateEarthState(Eigen::Matrix<float,6,1> x);
 
 Eigen::Matrix<float,6,1> elements2RV(float a, float e, float i, float O, float w, float f);

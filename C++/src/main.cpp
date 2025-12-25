@@ -57,6 +57,32 @@ int main(){
     // The above is the state of Earth in the ecliptic J2000 frame at JAN 01 2025 00:00:00.00, obtained using SPICE
     Earth earth(x0_Earth);
 
+    // Initialize array of ground station structs based on input .csv file
+    groundStationInputFilename = "../../GroundStations.csv";
+    std::vector<GroundStation> GroundStations = readInputGroundStationFile(groundStationInputFilename, alpha0);
+    int numObservingGroundStations; 
+
+    // Initialize Kalman filter parameters
+    Eigen::Matrix<float,6,1> x0Estimate = x0_Sat;
+    Eigen::Matrix<float,6,6> P0Estimate;
+    P << 5.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 5.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 5.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f;
+    KalmanEstimate kalmanEstimate = KalmanEstimate(x0Estimate, P0Estimate);
+
+    Eigen::Matrix<float,6,6> Q;
+    Q << 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f;
+    Eigen::Matrix<float, Dynamic, 1> Y;
+    float observationChancePerSecond = 0.2; // between 0 and 1; if 1, an observation comes in every time step, and if 0, an observation never comes
+
     // Initialize orbit controller
     Eigen::Matrix<float, 3, 6> K; // gain matrix for orbit LQR control (constraining actual orbit to reference orbit)
     K << 3.1696f, -0.1525f, 0.0f, 137.9086f, 0.0058f, 0.0f,
@@ -95,6 +121,7 @@ int main(){
     float vy_perturb = 0.04; // these represent acceleration biases during chute descent, roughly analogous to wind
     float vz_perturb = -0.05; //both vy_perturb and vz_perturb should have absolute value < 0.07 (for realistic wind impact)
 
+    // Initialize parameters for powered descent
     float powered_descent_height = 1000; // height at which chute descent terminates and powered descent begins, m
     float Isp = 300; // s, denotes fuel efficiency
     float Tmax = 20000; // N, maximum thrust of lander's thrusters. Tmin is 0.3*Tmax
@@ -111,6 +138,9 @@ int main(){
 
     std::ofstream orbitsFile; // file for logging parameters during orbital propagation
     orbitsFile.open("results/orbs.csv");
+
+    std::ofstream filterFile; // file for logging state estimate and uncertainties
+    filterFile.open("results/filter.csv");
 
     ofstream oneTimeOrbitParamsFile; // file for logging one-time orbital variables of interest
     oneTimeOrbitParamsFile.open("results/orbitVariablesOfInterest.txt");
@@ -195,13 +225,29 @@ int main(){
         globalTime = globalTime + ORBIT_DT; // Update global time
         orbitParams.alpha = W_E*globalTime + orbitParams.alpha0; // Update angle from ECI to ECEF frames
 
+        kalmanEstimatePrior = timeUpdate(kalmanEstimate, Q, MU_E, ORBIT_DT) // Perform kalman filter time update
+
         Eigen::Matrix<float,6,1> xSatNext = propagateActualSatellite(sat, sat.x_ECI, sat.u_ECI, earth.r_S2E); // propagate actual satellite traj
-        Eigen::Matrix<float,6,1> xRefSatNext = propagateReferenceSatellite(refSat, refSat.x_ECI); // propagate reference traj
+        Eigen::Matrix<float,6,1> xRefSatNext = propagateReferenceSatellite(refSat.x_ECI); // propagate reference traj
         Eigen::Matrix<float,6,1> xEarthNext = propagateEarthState(earth.x); // propagate Earth state
         sat.x_ECI = xSatNext;
         refSat.x_ECI = xRefSatNext;
         earth.x = xEarthNext;
         earth.r_S2E << xEarthNext(0), xEarthNext(1), xEarthNext(2); // update vector from Sun to Earth
+
+        // Update ground station parameters at the current time step
+        GroundStations = updateGroundStationLocations(GroundStations, orbitParams.alpha);
+        GroundStations = updateGroundStationObservability(GroundStations, sat.x_ECI);
+        numObservingGroundStations = getNumberObservingGroundStations(GroundStations);
+
+        // Perform Kalman filter measurement update (or don't, if a measurement is not available)
+        float randomNum = static_cast<float>(std::rand()) / RAND_MAX; // Generate random number between 0 and 1 to see if measurement is taken
+        if numObservingGroundStations > 0 & randomNum < observationChancePerSecond{
+            Y = getMeasurement(sat.x_ECI, GroundStations, W_E, numObservingGroundStations);
+            kalmanEstimate = measurementUpdate(kalmanEstimatePrior, Y, GroundStations, W_E, numObservingGroundStations);
+        } else {
+            kalmanEstimate = kalmanEstimatePrior;
+        }
 
         orbElems = RV2elements(refSat.x_ECI); // determine orbital elements
         orbitParams.R_ECI_2_LVLH = computeR_ECI_2_LVLH(orbElems(2), orbElems(3), orbElems(4)); // rotation from ECI frame to LVLH frame
@@ -242,7 +288,15 @@ int main(){
                 << sat.x_LLA(0) << "," << sat.x_LLA(1) << "," << sat.x_LLA(2) << ","
                 << orbitParams.alpha
                 << "\n"; // log orbit data
+
+        filterFile << globalTime << ","
+            << kalmanEstimate.x(0) << "," << kalmanEstimate.x(1) << "," << kalmanEstimate.x(2) << "," 
+            << kalmanEstimate.x(3) << "," << kalmanEstimate.x(4) << "," << kalmanEstimate.x(5) << ","
+            << 3*sqrt(kalmanEstimate.P(0,0)) << "," << 3*sqrt(kalmanEstimate.P(1,1)) << "," << 3*sqrt(kalmanEstimate.P(2,2)) << ","
+            << 3*sqrt(kalmanEstimate.P(3,3)) << "," << 3*sqrt(kalmanEstimate.P(4,4)) << "," << 3*sqrt(kalmanEstimate.P(5,5))
+            << "\n"; // Log filter data
     }
+
     cout << endl;
     cout << "Satellite state after equatorial orbits: " << endl;
     cout << "Position ECI, x (m): " << sat.x_ECI(0) << endl;
@@ -287,6 +341,11 @@ int main(){
     refSat.x_ECI(4) = refSat.x_ECI(4) + DeltaVRef(1);
     refSat.x_ECI(5) = refSat.x_ECI(5) + DeltaVRef(2);
 
+    // Change state estimate based on applied Delta-V
+    kalmanEstimate.x(3) = kalmanEstimate.x(3) + DeltaVAct(0);
+    kalmanEstimate.x(4) = kalmanEstimate.x(4) + DeltaVAct(4);
+    kalmanEstimate.x(5) = kalmanEstimate.x(5) + DeltaVAct(5);
+
     cout << "Actual Satellite Delta-V applied: " << endl;
     cout << "DVx (m/s): " << DeltaVAct(0) << endl;
     cout << "DVy (m/s): " << DeltaVAct(1) << endl;
@@ -304,13 +363,29 @@ int main(){
         globalTime = globalTime + ORBIT_DT;
         orbitParams.alpha = W_E*globalTime + orbitParams.alpha0;
 
+        kalmanEstimatePrior = timeUpdate(kalmanEstimate, Q, MU_E, ORBIT_DT) // Perform kalman filter time update
+
         Eigen::Matrix<float,6,1> xSatNext = propagateActualSatellite(sat, sat.x_ECI, sat.u_ECI, earth.r_S2E); // propagate actual satellite traj
-        Eigen::Matrix<float,6,1> xRefSatNext = propagateReferenceSatellite(refSat, refSat.x_ECI); // propagate reference satellite traj
+        Eigen::Matrix<float,6,1> xRefSatNext = propagateReferenceSatellite(refSat.x_ECI); // propagate reference satellite traj
         Eigen::Matrix<float,6,1> xEarthNext = propagateEarthState(earth.x); // propagate Earth state
         sat.x_ECI = xSatNext;
         refSat.x_ECI = xRefSatNext;
         earth.x = xEarthNext;
         earth.r_S2E << xEarthNext(0), xEarthNext(1), xEarthNext(2); // update vector from Sun to Earth
+
+        // Update ground station parameters at the current time step
+        GroundStations = updateGroundStationLocations(GroundStations, orbitParams.alpha);
+        GroundStations = updateGroundStationObservability(GroundStations, sat.x_ECI);
+        numObservingGroundStations = getNumberObservingGroundStations(GroundStations);
+
+        // Perform Kalman filter measurement update (or don't, if a measurement is not available)
+        float randomNum = static_cast<float>(std::rand()) / RAND_MAX; // Generate random number between 0 and 1 to see if measurement is taken
+        if numObservingGroundStations > 0 & randomNum < observationChancePerSecond{
+            Y = getMeasurement(sat.x_ECI, GroundStations, W_E, numObservingGroundStations);
+            kalmanEstimate = measurementUpdate(kalmanEstimatePrior, Y, GroundStations, W_E, numObservingGroundStations);
+        } else {
+            kalmanEstimate = kalmanEstimatePrior;
+        }
 
         Eigen::Matrix<float,5,1> orbElems = RV2elements(refSat.x_ECI); // determine orbital elements
         Eigen::Matrix<float,6,1> dx_ECI = sat.x_ECI - refSat.x_ECI;
@@ -351,6 +426,13 @@ int main(){
                 << orbitParams.alpha
                 << "\n"; // log orbit data
 
+        filterFile << globalTime << ","
+            << kalmanEstimate.x(0) << "," << kalmanEstimate.x(1) << "," << kalmanEstimate.x(2) << "," 
+            << kalmanEstimate.x(3) << "," << kalmanEstimate.x(4) << "," << kalmanEstimate.x(5) << ","
+            << 3*sqrt(kalmanEstimate.P(0,0)) << "," << 3*sqrt(kalmanEstimate.P(1,1)) << "," << 3*sqrt(kalmanEstimate.P(2,2)) << ","
+            << 3*sqrt(kalmanEstimate.P(3,3)) << "," << 3*sqrt(kalmanEstimate.P(4,4)) << "," << 3*sqrt(kalmanEstimate.P(5,5))
+            << "\n"; // Log filter data
+
         // Log time of passage over desired drop point latitude and mark down longitudes at each
         if (abs(orbitParams.desiredDropLocation(0) - sat.x_LLA(0)) <= orbitParams.latTolerance) {
             if (!orbitParams.hasOrbitedOnce) {
@@ -386,6 +468,7 @@ int main(){
             cout << "Dropping capsule!" << endl;
         }
 
+        // Log chute deployment time
         if (orbitParams.hasDeployed && (globalTime >= orbitParams.timeOfDeployment+bd_time) && !orbitParams.targetLocAtChuteDeployLogged) {
             Eigen::Vector3d r_targetECEF = LLA2ECEF(orbitParams.desiredDropLocation);
             orbitParams.R_ECEF_2_ECI = computeR_ECEF_2_ECI(orbitParams.alpha);
@@ -631,6 +714,7 @@ int main(){
     ballistic_descent_info_file.close();
     oneTimeOrbitParamsFile.close();
     orbitsFile.close();
+    filterFile.close();
     ballisticDescentFile.close();
     chuteDescentFile.close();
     poweredDescentFile.close();
