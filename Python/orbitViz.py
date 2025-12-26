@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from vpython import canvas, sphere, color, vector, textures, distant_light, local_light, arrow, rate
+from vpython import canvas, sphere, color, vector, textures, distant_light, local_light, arrow, rate, graph, gcurve
 
 def compute_R_ECI_2_ECEF(alpha):
     R = np.array([[np.cos(alpha), np.sin(alpha), 0],
@@ -12,7 +12,6 @@ def LLA_2_ECEF(lat, lon, alt):
     x_ECEF = (6378*1000 + alt)*np.cos(lat)*np.cos(lon)
     y_ECEF = (6378*1000 + alt)*np.cos(lat)*np.sin(lon)
     z_ECEF = (6378*1000 + alt)*np.sin(lat)
-
     r_ECEF = np.array([x_ECEF, y_ECEF, z_ECEF])
     return r_ECEF
 
@@ -96,9 +95,57 @@ Sat_alt = df['satalt']
 # Alpha (angle between ECI and ECEF frames)
 alphas = df['alpha']
 
+df2 = pd.read_csv("../C++/results/filter.csv", header=None, names=['t',
+                                                        'pxEst','pyEst','pzEst','vxEst','vyEst','vzEst',
+                                                        'px3Sig','py3Sig','pz3Sig','vx3Sig','vy3Sig','vz3Sig'])
+
+# State estimate
+px_Estimate = df2['pxEst']
+py_Estimate = df2['pyEst']
+pz_Estimate = df2['pzEst']
+vx_Estimate = df2['vxEst']
+vy_Estimate = df2['vyEst']
+vz_Estimate = df2['vzEst']
+
+# Standard deviation bounds
+px3Sig = df2['px3Sig']
+py3Sig = df2['py3Sig']
+pz3Sig = df2['pz3Sig']
+vx3Sig = df2['vx3Sig']
+vy3Sig = df2['vy3Sig']
+vz3Sig = df2['vz3Sig']
+
+df3 = pd.read_csv("../GroundStations.csv", header=None, names=['locLat', 'locLon', 'locAlt', 'rangeAcc', 'rangeRateAcc', 'visibilityCone'])
+
+# Ground station locations
+groundStationLats = df3['locLat']
+groundStationLons = df3['locLon']
+groundStationAlts = df3['locAlt']
+groundStationRangeAccs = df3['rangeAcc']
+groundStationRangeRateAccs = df3['rangeRateAcc']
+
+N_stations = len(groundStationLats)
+groundStationECEFLocations = np.zeros((3, N_stations))
+for i in range(N_stations):
+    lat = groundStationLats[i]*(np.pi/180)
+    lon = groundStationLons[i]*(np.pi/180)
+    alt = groundStationAlts[i]
+    r_ECEF = LLA_2_ECEF(lat, lon, alt)
+    groundStationECEFLocations[0][i] = r_ECEF[0]
+    groundStationECEFLocations[1][i] = r_ECEF[1]
+    groundStationECEFLocations[2][i] = r_ECEF[2]
+
+observabilityAngle = 100*(np.pi/180)
+
 geoCanvas = canvas(title="Geocentric View", width=400, height=300, background=color.black)
 helioCanvas = canvas(title="Heliocentric View", width=400, height=300, background=color.black)
 lvlhCanvas = canvas(title="Local Vertical Line Heading View", width=400, height=300, background=vector(0.5,0.5,0.5))
+pxUncGraph = graph(title = 'X-Position Uncertainty', xtitle='Global Time (s)', ytitle= 'Position Error (m)', ymax=250, ymin=-250)
+pyUncGraph = graph(title = 'Y-Position Uncertainty', xtitle='Global Time (s)', ytitle= 'Position Error (m)', ymax=250, ymin=-250)
+pzUncGraph = graph(title = 'Z-Position Uncertainty', xtitle='Global Time (s)', ytitle= 'Position Error (m)', ymax=250, ymin=-250)
+vxUncGraph = graph(title = 'X-Velocity Uncertainty', xtitle='Global Time (s)', ytitle='Velocity Error (m)', ymax=30, ymin=-30)
+vyUncGraph = graph(title = 'Y-Velocity Uncertainty', xtitle='Global Time (s)', ytitle='Velocity Error (m)', ymax=30, ymin=-30)
+vzUncGraph = graph(title = 'Z-Velocity Uncertainty', xtitle='Global Time (s)', ytitle='Velocity Error (m)', ymax=30, ymin=-30)
 
 # Set up geoCanvas
 earth = sphere(canvas=geoCanvas, pos=vector(0,0,0), radius=6378*1000, texture=textures.earth, shininess=0)
@@ -120,6 +167,22 @@ sat = sphere(canvas=geoCanvas, pos=vector(satECIx, satECIy, satECIz), radius = 6
 
 refSatECIx, refSatECIy, refSatECIz = ECI_2_VPython(refSat_ECI_px[0], refSat_ECI_py[0], refSat_ECI_pz[0])
 refSat = sphere(canvas=geoCanvas, pos=vector(refSatECIx, refSatECIy, refSatECIz), radius = 6378*10, color=color.green, make_trail = True)
+
+groundStationECILocations = np.matmul(R_ECEF_2_ECI, groundStationECEFLocations)
+stationList = []
+for i in range(N_stations):
+    GSLocx, GSLocy, GSLocz = ECI_2_VPython(groundStationECILocations[0][i], groundStationECILocations[1][i], groundStationECILocations[2][i]) 
+    station_i = sphere(canvas=geoCanvas, pos=vector(GSLocx, GSLocy, GSLocz), radius=6378*25, color=color.orange, make_trail=False)
+    stationList.append(station_i)
+
+    rGS2Satx = Sat_ECI_px[0] - groundStationECILocations[0][i]
+    rGS2Saty = Sat_ECI_py[1] - groundStationECILocations[1][i]
+    rGS2Satz = Sat_ECI_pz[2] - groundStationECILocations[2][i]
+    rGS2SatMag = np.sqrt(rGS2Satx**2 + rGS2Saty**2 + rGS2Satz**2)
+    rGSMag = np.sqrt(groundStationECILocations[0][i]**2 + groundStationECILocations[1][i]**2 + groundStationECILocations[2][i]**2)
+    thetaObs_i = np.arccos((groundStationECILocations[0][i]*rGS2Satx + groundStationECILocations[1][i]*rGS2Saty + groundStationECILocations[2][i]*rGS2Satz)/(rGS2SatMag*rGSMag))
+    if thetaObs_i < observabilityAngle:
+        stationList[i].color = color.blue
 
 # Set up helioCanvas
 distance_scalefactor = 100
@@ -154,6 +217,76 @@ relctrlx, relctrly, relctrlz = LVLH_2_VPython(u_LVLH_x[0], u_LVLH_y[0], u_LVLH_z
 relativeSat = sphere(canvas=lvlhCanvas, pos=vector(relposx, relposy, relposz), radius=250, shininess=0, color=color.magenta)
 lvlhControl = arrow(canvas=lvlhCanvas, pos=vector(relposx, relposy, relposz), axis=vector(relctrlx, relctrly, relctrlz), color = color.cyan)
 
+# Set up posUncGraph
+pxErr = gcurve(graph=pxUncGraph, color=color.blue)
+pxErr.plot(ts[0], Sat_ECI_px[0] - px_Estimate[0])
+
+pyErr = gcurve(graph=pyUncGraph, color=color.green)
+pyErr.plot(ts[0], Sat_ECI_py[0] - py_Estimate[0])
+
+pzErr = gcurve(graph=pzUncGraph, color=color.magenta)
+pzErr.plot(ts[0], Sat_ECI_pz[0] - pz_Estimate[0])
+
+pxUb = gcurve(graph=pxUncGraph, color=color.black, width=1)
+pxUb.plot(ts[0], px3Sig[0])
+pxLb = gcurve(graph=pxUncGraph, color=color.black, width=1)
+pxLb.plot(ts[0], -px3Sig[0])
+
+pyUb = gcurve(graph=pyUncGraph, color=color.black, width=1)
+pyUb.plot(ts[0], py3Sig[0])
+pyLb = gcurve(graph=pyUncGraph, color=color.black, width=1)
+pyLb.plot(ts[0], -py3Sig[0])
+
+pzUb = gcurve(graph=pzUncGraph, color=color.black, width=1)
+pzUb.plot(ts[0], py3Sig[0])
+pzLb = gcurve(graph=pzUncGraph, color=color.black, width=1)
+pzLb.plot(ts[0], -pz3Sig[0])
+
+# Set up velUncGraph
+vxErr = gcurve(graph=vxUncGraph, color=color.blue)
+vxErr.plot(ts[0], Sat_ECI_vx[0] - vx_Estimate[0])
+
+vyErr = gcurve(graph=vyUncGraph, color=color.green)
+vyErr.plot(ts[0], Sat_ECI_vy[0] - vy_Estimate[0])
+
+vzErr = gcurve(graph=vzUncGraph, color=color.magenta)
+vzErr.plot(ts[0], Sat_ECI_vz[0] - vz_Estimate[0])
+
+vxUb = gcurve(graph=vxUncGraph, color=color.black, width=1)
+vxUb.plot(ts[0], vx3Sig[0])
+vxLb = gcurve(graph=vxUncGraph, color=color.black, width=1)
+vxLb.plot(ts[0], -vx3Sig[0])
+
+vyUb = gcurve(graph=vyUncGraph, color=color.black, width=1)
+vyUb.plot(ts[0], vy3Sig[0])
+vyLb = gcurve(graph=vyUncGraph, color=color.black, width=1)
+vyLb.plot(ts[0], -vy3Sig[0])
+
+vzUb = gcurve(graph=vzUncGraph, color=color.black, width=1)
+vzUb.plot(ts[0], vz3Sig[0])
+vzLb = gcurve(graph=vzUncGraph, color=color.black, width=1)
+vzLb.plot(ts[0], -vz3Sig[0])
+
+pxErrsPlotted = list(zip(ts, px_Estimate-Sat_ECI_px))
+pyErrsPlotted = list(zip(ts, py_Estimate-Sat_ECI_py))
+pzErrsPlotted = list(zip(ts, pz_Estimate-Sat_ECI_pz))
+vxErrsPlotted = list(zip(ts, vx_Estimate-Sat_ECI_vx))
+vyErrsPlotted = list(zip(ts, vy_Estimate-Sat_ECI_vy))
+vzErrsPlotted = list(zip(ts, vz_Estimate-Sat_ECI_vz))
+pxUbPlotted = list(zip(ts, px3Sig))
+pxLbPlotted = list(zip(ts, -px3Sig))
+pyUbPlotted = list(zip(ts, py3Sig))
+pyLbPlotted = list(zip(ts, -py3Sig))
+pzUbPlotted = list(zip(ts, pz3Sig))
+pzLbPlotted = list(zip(ts, -pz3Sig))
+vxUbPlotted = list(zip(ts, vx3Sig))
+vxLbPlotted = list(zip(ts, -vx3Sig))
+vyUbPlotted = list(zip(ts, vy3Sig))
+vyLbPlotted = list(zip(ts, -vy3Sig))
+vzUbPlotted = list(zip(ts, vz3Sig))
+vzLbPlotted = list(zip(ts,-vz3Sig))
+
+
 w = 2*np.pi/86164 # rotation rate of Earth, rad/s
 count = 0
 t = ts[count]
@@ -182,6 +315,22 @@ while not hasReachedFinalTime:
     refSatECIx, refSatECIy, refSatECIz = ECI_2_VPython(refSat_ECI_px[count], refSat_ECI_py[count], refSat_ECI_pz[count])
     refSat.pos = vector(refSatECIx, refSatECIy, refSatECIz)
 
+    groundStationECILocations = np.matmul(R_ECEF_2_ECI, groundStationECEFLocations)
+    for i in range(N_stations):
+        GSLocx, GSLocy, GSLocz = ECI_2_VPython(groundStationECILocations[0][i], groundStationECILocations[1][i], groundStationECILocations[2][i]) 
+        stationList[i].pos = vector(GSLocx, GSLocy, GSLocz)
+
+        rGS2Satx = Sat_ECI_px[count] - groundStationECILocations[0][i]
+        rGS2Saty = Sat_ECI_py[count] - groundStationECILocations[1][i]
+        rGS2Satz = Sat_ECI_pz[count] - groundStationECILocations[2][i]
+        rGS2SatMag = np.sqrt(rGS2Satx**2 + rGS2Saty**2 + rGS2Satz**2)
+        rGSMag = np.sqrt(groundStationECILocations[0][i]**2 + groundStationECILocations[1][i]**2 + groundStationECILocations[2][i]**2)
+        thetaObs_i = np.arccos((groundStationECILocations[0][i]*rGS2Satx + groundStationECILocations[1][i]*rGS2Saty + groundStationECILocations[2][i]*rGS2Satz)/(rGS2SatMag*rGSMag))
+        if thetaObs_i < observabilityAngle:
+            stationList[i].color = color.blue
+        else:
+            stationList[i].color = color.orange
+
     # Update helioCanvas
     helioEx, helioEy, helioEz = ECI_2_VPython(S2E_px[count], S2E_py[count], S2E_pz[count])
     helioEarth.pos = vector(helioEx/distance_scalefactor, helioEy/distance_scalefactor, helioEz/distance_scalefactor)
@@ -195,6 +344,47 @@ while not hasReachedFinalTime:
     lvlhControl.pos = vector(relposx, relposy, relposz)
     lvlhControl.axis = vector(relctrlx, relctrly, relctrlz)
     lvlhControl.headwidth = lvlhControl.shaftwidth
+
+    if count < 1000:
+        pxErr.data = pxErrsPlotted[:count]
+        pyErr.data = pyErrsPlotted[:count]
+        pzErr.data = pzErrsPlotted[:count]
+        vxErr.data = vxErrsPlotted[:count]
+        vyErr.data = vyErrsPlotted[:count]
+        vzErr.data = vzErrsPlotted[:count]
+        pxUb.data = pxUbPlotted[:count]
+        pxLb.data = pxLbPlotted[:count]
+        pyUb.data = pyUbPlotted[:count]
+        pyLb.data = pyLbPlotted[:count]
+        pzUb.data = pzUbPlotted[:count]
+        pzLb.data = pzLbPlotted[:count]
+        vxUb.data = vxUbPlotted[:count]
+        vxLb.data = vxLbPlotted[:count]
+        vyUb.data = vyUbPlotted[:count]
+        vyLb.data = vyLbPlotted[:count]
+        vzUb.data = vzUbPlotted[:count]
+        vzLb.data = vzLbPlotted[:count]
+    else:
+        pxErr.data = pxErrsPlotted[count-1000:count]
+        pyErr.data = pyErrsPlotted[count-1000:count]
+        pzErr.data = pzErrsPlotted[count-1000:count]
+        vxErr.data = vxErrsPlotted[count-1000:count]
+        vyErr.data = vyErrsPlotted[count-1000:count]
+        vzErr.data = vzErrsPlotted[count-1000:count]
+        pxUb.data = pxUbPlotted[count-1000:count]
+        pxLb.data = pxLbPlotted[count-1000:count]
+        pyUb.data = pyUbPlotted[count-1000:count]
+        pyLb.data = pyLbPlotted[count-1000:count]
+        pzUb.data = pzUbPlotted[count-1000:count]
+        pzLb.data = pzLbPlotted[count-1000:count]
+        vxUb.data = vxUbPlotted[count-1000:count]
+        vxLb.data = vxLbPlotted[count-1000:count]
+        vyUb.data = vyUbPlotted[count-1000:count]
+        vyLb.data = vyLbPlotted[count-1000:count]
+        vzUb.data = vzUbPlotted[count-1000:count]
+        vzLb.data = vzLbPlotted[count-1000:count]
+
+
 
     if t == ts[-1]:
         hasReachedFinalTime = True

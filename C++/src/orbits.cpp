@@ -252,11 +252,11 @@ Eigen::Matrix<float,5,1> RV2elements(Eigen::Matrix<float,6,1> x) {
 
     float T;
     Eigen::Vector3d n;
-    n << cos(O), sin(O), 0;
+    n << cos(O), sin(O), 0.0f;
     float cosT = n.dot(r)/r.norm();
     T = acos(cosT);
     if (r.dot(v) < 0) {
-        T = 2*PI - T;
+        T = 2.0f*PI - T;
     }
 
     Eigen::Matrix<float,5,1> elems;

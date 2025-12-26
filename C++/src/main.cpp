@@ -205,6 +205,13 @@ int main(){
                 << orbitParams.alpha
                 << "\n";
 
+    filterFile << globalTime << ","
+            << kalmanEstimate.x(0) << "," << kalmanEstimate.x(1) << "," << kalmanEstimate.x(2) << "," 
+            << kalmanEstimate.x(3) << "," << kalmanEstimate.x(4) << "," << kalmanEstimate.x(5) << ","
+            << 3*sqrt(kalmanEstimate.P(0,0)) << "," << 3*sqrt(kalmanEstimate.P(1,1)) << "," << 3*sqrt(kalmanEstimate.P(2,2)) << ","
+            << 3*sqrt(kalmanEstimate.P(3,3)) << "," << 3*sqrt(kalmanEstimate.P(4,4)) << "," << 3*sqrt(kalmanEstimate.P(5,5))
+            << "\n"; // Log filter data
+
     // Begin orbital simulation by orbiting in initial orbit for NUM_ORBITS_BEFORE_INCL_CHANGE
     cout << "Starting satellite state: " << endl;
     cout << "Position ECI, x (m): " << sat.x_ECI(0) << endl;
@@ -214,12 +221,14 @@ int main(){
     cout << "Velocity ECI, y (m/s): " << sat.x_ECI(4) << endl;
     cout << "Velocity ECI, z (m/s): " << sat.x_ECI(5) << endl;
 
-    cout << "Satellite orbital parameters before equatorial orbits: " << endl;
+    cout << endl;
+
+    cout << "Starting satellite orbital parameters: " << endl;
     cout << "Semimajor axis, a (m): " << a0_Sat << endl;
     cout << "Eccentricity, e: " << e0_Sat << endl;
-    cout << "Inclination, i (deg): " << (180/PI)*i0_Sat << endl;
-    cout << "Right Ascension of Ascending Node, Omega (deg): " << (180/PI)*O0_Sat << endl;
-    cout << "Argument of Latitude at Epoch, omega + f (deg): " << (180/PI)*(w0_Sat+f0_Sat) << endl;
+    cout << "Inclination, i (deg): " << (180.0f/PI)*i0_Sat << endl;
+    cout << "Right Ascension of Ascending Node, Omega (deg): " << (180.0f/PI)*O0_Sat << endl;
+    cout << "Argument of Latitude at Epoch, omega + f (deg): " << (180.0f/PI)*(w0_Sat+f0_Sat) << endl;
 
     for ( int i = 1; i <= NUM_ORBITS_BEFORE_INCL_CHANGE*numIterationsPerOrbit; i++) {
 
@@ -306,16 +315,14 @@ int main(){
     cout << "Velocity ECI, x (m/s): " << sat.x_ECI(3) << endl;
     cout << "Velocity ECI, y (m/s): " << sat.x_ECI(4) << endl;
     cout << "Velocity ECI, z (m/s): " << sat.x_ECI(5) << endl;
-
     cout << endl;
 
-    cout << "Satellite orbital parameters after equatorial orbits: " << endl;
+    cout << "Satellite orbital elements after equatorial orbits: " << endl;
     cout << "Semimajor axis, a (m): " << orbElems(0) << endl;
     cout << "Eccentricity, e: " << orbElems(1) << endl;
-    cout << "Inclination, i (deg): " << (180/PI)*orbElems(2) << endl;
-    cout << "Right Ascension of Ascending Node, Omega (deg): " << (180/PI)*orbElems(3) << endl;
-    cout << "Argument of Latitude at Epoch, omega + f (deg): " << (180/PI)*orbElems(4) << endl;
-
+    cout << "Inclination, i (deg): " << (180.0f/PI)*orbElems(2) << endl;
+    cout << "Right Ascension of Ascending Node, Omega (deg): " << (180.0f/PI)*orbElems(3) << endl;
+    cout << "Argument of Latitude at Epoch, omega + f (deg): " << (180.0f/PI)*orbElems(4) << endl;
     cout << endl;
 
     cout << "Satellite state estimate after equatorial orbits: " << endl;
@@ -325,7 +332,6 @@ int main(){
     cout << "Velocity ECI, x (m/s): " << kalmanEstimate.x(3) << endl;
     cout << "Velocity ECI, y (m/s): " << kalmanEstimate.x(4) << endl;
     cout << "Velocity ECI, z (m/s): " << kalmanEstimate.x(5) << endl;
-
     cout << endl;
 
     // Now, compute and execute the Delta-V necessary for the satellite to reach a desired orbit necessary to pass over the drop point.
@@ -370,6 +376,27 @@ int main(){
     cout << "DVy Ref (m/s): " << DeltaVRef(1) << endl;
     cout << "DVz Ref (m/s): " << DeltaVRef(2) << endl;
     cout << endl;
+
+    cout << "Satellite state after Delta-V applied: " << endl;
+    cout << "Position ECI, x (m): " << sat.x_ECI(0) << endl;
+    cout << "Position ECI, y (m): " << sat.x_ECI(1) << endl;
+    cout << "Position ECI, z (m): " << sat.x_ECI(2) << endl;
+    cout << "Velocity ECI, x (m/s): " << sat.x_ECI(3) << endl;
+    cout << "Velocity ECI, y (m/s): " << sat.x_ECI(4) << endl;
+    cout << "Velocity ECI, z (m/s): " << sat.x_ECI(5) << endl;
+
+    cout << endl;
+
+    orbElems = RV2elements(sat.x_ECI); // determine orbital elements
+    cout << "Satellite orbital elements after Delta-V applied: " << endl;
+    cout << "Semimajor axis, a (m): " << orbElems(0) << endl;
+    cout << "Eccentricity, e: " << orbElems(1) << endl;
+    cout << "Inclination, i (deg): " << (180.0f/PI)*orbElems(2) << endl;
+    cout << "Right Ascension of Ascending Node, Omega (deg): " << (180.0f/PI)*orbElems(3) << endl;
+    cout << "Argument of Latitude at Epoch, omega + f (deg): " << (180.0f/PI)*orbElems(4) << endl;
+
+    cout << endl;
+
   
     // Continue propagating the orbit that passes over the drop point at its zenith until the capsule drops
     while (!orbitParams.hasDeployed) {
@@ -387,7 +414,7 @@ int main(){
         earth.r_S2E << xEarthNext(0), xEarthNext(1), xEarthNext(2); // update vector from Sun to Earth
 
         // Update ground station parameters at the current time step
-        groundStations = updateGroundStationLocations(GroundStations, orbitParams.alpha);
+        GroundStations = updateGroundStationLocations(GroundStations, orbitParams.alpha);
         GroundStations = updateGroundStationObservability(GroundStations, sat.x_ECI);
         numObservingGroundStations = getNumberObservingGroundStations(GroundStations);
 
@@ -514,13 +541,23 @@ int main(){
     cout << "Velocity ECI, x: " << sat.x_ECI(3) << endl;
     cout << "Velocity ECI, y: " << sat.x_ECI(4) << endl;
     cout << "Velocity ECI, z: " << sat.x_ECI(5) << endl;
+    cout << endl;
 
-    cout << "Satellite orbital parameters after equatorial orbits: " << endl;
+    cout << "Satellite orbital parameters at point of capsule deployment: " << endl;
     cout << "Semimajor axis, a (m): " << orbElems(0) << endl;
     cout << "Eccentricity, e: " << orbElems(1) << endl;
     cout << "Inclination, i (deg): " << (180/PI)*orbElems(2) << endl;
     cout << "Right Ascension of Ascending Node, Omega (deg): " << (180/PI)*orbElems(3) << endl;
     cout << "Argument of Latitude at Epoch, omega + f (deg): " << (180/PI)*orbElems(4) << endl;
+    cout << endl;
+
+    cout << "Satellite state estimate at point of capsule deployment: " << endl;
+    cout << "Position ECI, x (m): " << kalmanEstimate.x(0) << endl;
+    cout << "Position ECI, y (m): " << kalmanEstimate.x(1) << endl;
+    cout << "Position ECI, z (m): " << kalmanEstimate.x(2) << endl;
+    cout << "Velocity ECI, x (m/s): " << kalmanEstimate.x(3) << endl;
+    cout << "Velocity ECI, y (m/s): " << kalmanEstimate.x(4) << endl;
+    cout << "Velocity ECI, z (m/s): " << kalmanEstimate.x(5) << endl;
     cout << endl;
 
     // Now, link end of orbits to beginning of EDL ballistic phase.
