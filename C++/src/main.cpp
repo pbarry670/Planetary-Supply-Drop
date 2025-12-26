@@ -4,31 +4,31 @@
 #include <vector>
 #include "../include/edl.h"
 #include "../include/orbits.h"
+#include "../include/orbitDet.h"
 #include <thread>
 #include <chrono>
 #include <Python.h>
 
 using namespace std;
 
-// To compile: g++ -std=c++11 -I path/to/eigen-3.4.0 -I"C:\PythonXX\include" 
-// -L"C:\PythonXX\libs" src/edl.cpp src/orbits.cpp src/main.cpp -o main -lpythonXX
+// To compile: g++ -std=c++11 -I path/to/eigen-3.4.0 src/edl.cpp src/orbits.cpp src/orbitDet.cpp src/main.cpp -I/usr/include/python3.8 -lpython3.8 -o main
 
 // To execute: "./main" or "main.exe"
 
 // My path to eigen: ../../../extensions/eigen-3.4.0
-// My Python version: Python37
+// Python version used: 3.8.0
 
 int main(){
 
     // Initialize orbit parameters
-    float desiredDropLocationLat = 38.836587*(PI/180); // desired drop latitude, rad
-    float desiredDropLocationLon = -77.196691*(PI/180); // desired drop longitude, rad
+    float desiredDropLocationLat = 38.836587*(PI/180.0); // desired drop latitude, rad
+    float desiredDropLocationLon = -77.196691*(PI/180.0); // desired drop longitude, rad
     float desiredDropLocationAlt = 0; // m, assumes a spherical Earth
     Eigen::Vector3d desiredDropLocation (desiredDropLocationLat, desiredDropLocationLon, desiredDropLocationAlt);
 
-    float latTol = 0.01*(PI/180); // rad. Denotes the tolerance of determining when the satellite is considered to be passing over the latitude of the target location
-    float lonTol = 0.05*(PI/180); // rad. Denotes the tolerance of the +/- of longitude error when satellite is passing over target location
-    float DThetaTol = 0.05*(PI/180); // rad. Denotes the tolerance of when the satellite is DTheta phase angle from the desired drop point in the orbital plane.
+    float latTol = 0.01*(PI/180.0); // rad. Denotes the tolerance of determining when the satellite is considered to be passing over the latitude of the target location
+    float lonTol = 0.05*(PI/180.0); // rad. Denotes the tolerance of the +/- of longitude error when satellite is passing over target location
+    float DThetaTol = 0.05*(PI/180.0); // rad. Denotes the tolerance of when the satellite is DTheta phase angle from the desired drop point in the orbital plane.
     float timeToDropFromFinalPass; // s. Assumes a circular orbit - represents the elapsed time from making the final pass over the drop point latitude to the drop time
     float alpha0 = 0; // rad. Denotes the angle between the ECI and ECEF frames at start of orbit propagation
 
@@ -58,20 +58,21 @@ int main(){
     Earth earth(x0_Earth);
 
     // Initialize array of ground station structs based on input .csv file
-    groundStationInputFilename = "../../GroundStations.csv";
+    std::string groundStationInputFilename = "../GroundStations.csv";
     std::vector<GroundStation> GroundStations = readInputGroundStationFile(groundStationInputFilename, alpha0);
     int numObservingGroundStations; 
 
     // Initialize Kalman filter parameters
     Eigen::Matrix<float,6,1> x0Estimate = x0_Sat;
     Eigen::Matrix<float,6,6> P0Estimate;
-    P << 5.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+    P0Estimate << 5.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
         0.0f, 5.0f, 0.0f, 0.0f, 0.0f, 0.0f,
         0.0f, 0.0f, 5.0f, 0.0f, 0.0f, 0.0f,
         0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
         0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
         0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f;
     KalmanEstimate kalmanEstimate = KalmanEstimate(x0Estimate, P0Estimate);
+    KalmanEstimate kalmanEstimatePrior = kalmanEstimate;
 
     Eigen::Matrix<float,6,6> Q;
     Q << 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
@@ -80,7 +81,7 @@ int main(){
         0.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f,
         0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.0f,
         0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f;
-    Eigen::Matrix<float, Dynamic, 1> Y;
+    Eigen::Matrix<float, Eigen::Dynamic, 1> Y;
     float observationChancePerSecond = 0.2; // between 0 and 1; if 1, an observation comes in every time step, and if 0, an observation never comes
 
     // Initialize orbit controller
@@ -104,7 +105,7 @@ int main(){
 
     // Initialize capsule state
     float V_0_ballistic = sqrt(MU_E/ORB_ALT); // initial velocity, m/s
-    float gamma_0_ballistic = 5*(PI/180); // initial flight path angle, rads
+    float gamma_0_ballistic = 5*(PI/180.0); // initial flight path angle, rads
     float h_0_ballistic = ORB_ALT - R_EARTH; // initial altitude, m
     Eigen::Vector3d V_0_ballistic_vec; // will hold velocity vector at orbit drop point
     Eigen::Vector3d r_0_ballistic_vec; // will hold position vector at orbit drop point
@@ -213,7 +214,7 @@ int main(){
     cout << "Velocity ECI, y (m/s): " << sat.x_ECI(4) << endl;
     cout << "Velocity ECI, z (m/s): " << sat.x_ECI(5) << endl;
 
-    cout << "Satellite orbital parameters after equatorial orbits: " << endl;
+    cout << "Satellite orbital parameters before equatorial orbits: " << endl;
     cout << "Semimajor axis, a (m): " << a0_Sat << endl;
     cout << "Eccentricity, e: " << e0_Sat << endl;
     cout << "Inclination, i (deg): " << (180/PI)*i0_Sat << endl;
@@ -225,7 +226,7 @@ int main(){
         globalTime = globalTime + ORBIT_DT; // Update global time
         orbitParams.alpha = W_E*globalTime + orbitParams.alpha0; // Update angle from ECI to ECEF frames
 
-        kalmanEstimatePrior = timeUpdate(kalmanEstimate, Q, MU_E, ORBIT_DT) // Perform kalman filter time update
+        kalmanEstimatePrior = timeUpdate(kalmanEstimate, Q, MU_E, ORBIT_DT); // Perform kalman filter time update
 
         Eigen::Matrix<float,6,1> xSatNext = propagateActualSatellite(sat, sat.x_ECI, sat.u_ECI, earth.r_S2E); // propagate actual satellite traj
         Eigen::Matrix<float,6,1> xRefSatNext = propagateReferenceSatellite(refSat.x_ECI); // propagate reference traj
@@ -242,7 +243,7 @@ int main(){
 
         // Perform Kalman filter measurement update (or don't, if a measurement is not available)
         float randomNum = static_cast<float>(std::rand()) / RAND_MAX; // Generate random number between 0 and 1 to see if measurement is taken
-        if numObservingGroundStations > 0 & randomNum < observationChancePerSecond{
+        if (numObservingGroundStations > 0 & randomNum < observationChancePerSecond){
             Y = getMeasurement(sat.x_ECI, GroundStations, W_E, numObservingGroundStations);
             kalmanEstimate = measurementUpdate(kalmanEstimatePrior, Y, GroundStations, W_E, numObservingGroundStations);
         } else {
@@ -306,12 +307,25 @@ int main(){
     cout << "Velocity ECI, y (m/s): " << sat.x_ECI(4) << endl;
     cout << "Velocity ECI, z (m/s): " << sat.x_ECI(5) << endl;
 
+    cout << endl;
+
     cout << "Satellite orbital parameters after equatorial orbits: " << endl;
     cout << "Semimajor axis, a (m): " << orbElems(0) << endl;
     cout << "Eccentricity, e: " << orbElems(1) << endl;
     cout << "Inclination, i (deg): " << (180/PI)*orbElems(2) << endl;
     cout << "Right Ascension of Ascending Node, Omega (deg): " << (180/PI)*orbElems(3) << endl;
     cout << "Argument of Latitude at Epoch, omega + f (deg): " << (180/PI)*orbElems(4) << endl;
+
+    cout << endl;
+
+    cout << "Satellite state estimate after equatorial orbits: " << endl;
+    cout << "Position ECI, x (m): " << kalmanEstimate.x(0) << endl;
+    cout << "Position ECI, y (m): " << kalmanEstimate.x(1) << endl;
+    cout << "Position ECI, z (m): " << kalmanEstimate.x(2) << endl;
+    cout << "Velocity ECI, x (m/s): " << kalmanEstimate.x(3) << endl;
+    cout << "Velocity ECI, y (m/s): " << kalmanEstimate.x(4) << endl;
+    cout << "Velocity ECI, z (m/s): " << kalmanEstimate.x(5) << endl;
+
     cout << endl;
 
     // Now, compute and execute the Delta-V necessary for the satellite to reach a desired orbit necessary to pass over the drop point.
@@ -343,8 +357,8 @@ int main(){
 
     // Change state estimate based on applied Delta-V
     kalmanEstimate.x(3) = kalmanEstimate.x(3) + DeltaVAct(0);
-    kalmanEstimate.x(4) = kalmanEstimate.x(4) + DeltaVAct(4);
-    kalmanEstimate.x(5) = kalmanEstimate.x(5) + DeltaVAct(5);
+    kalmanEstimate.x(4) = kalmanEstimate.x(4) + DeltaVAct(1);
+    kalmanEstimate.x(5) = kalmanEstimate.x(5) + DeltaVAct(2);
 
     cout << "Actual Satellite Delta-V applied: " << endl;
     cout << "DVx (m/s): " << DeltaVAct(0) << endl;
@@ -362,8 +376,7 @@ int main(){
 
         globalTime = globalTime + ORBIT_DT;
         orbitParams.alpha = W_E*globalTime + orbitParams.alpha0;
-
-        kalmanEstimatePrior = timeUpdate(kalmanEstimate, Q, MU_E, ORBIT_DT) // Perform kalman filter time update
+        kalmanEstimatePrior = timeUpdate(kalmanEstimate, Q, MU_E, ORBIT_DT); // Perform kalman filter time update
 
         Eigen::Matrix<float,6,1> xSatNext = propagateActualSatellite(sat, sat.x_ECI, sat.u_ECI, earth.r_S2E); // propagate actual satellite traj
         Eigen::Matrix<float,6,1> xRefSatNext = propagateReferenceSatellite(refSat.x_ECI); // propagate reference satellite traj
@@ -374,13 +387,13 @@ int main(){
         earth.r_S2E << xEarthNext(0), xEarthNext(1), xEarthNext(2); // update vector from Sun to Earth
 
         // Update ground station parameters at the current time step
-        GroundStations = updateGroundStationLocations(GroundStations, orbitParams.alpha);
+        groundStations = updateGroundStationLocations(GroundStations, orbitParams.alpha);
         GroundStations = updateGroundStationObservability(GroundStations, sat.x_ECI);
         numObservingGroundStations = getNumberObservingGroundStations(GroundStations);
 
         // Perform Kalman filter measurement update (or don't, if a measurement is not available)
         float randomNum = static_cast<float>(std::rand()) / RAND_MAX; // Generate random number between 0 and 1 to see if measurement is taken
-        if numObservingGroundStations > 0 & randomNum < observationChancePerSecond{
+        if (numObservingGroundStations > 0 & randomNum < observationChancePerSecond) {
             Y = getMeasurement(sat.x_ECI, GroundStations, W_E, numObservingGroundStations);
             kalmanEstimate = measurementUpdate(kalmanEstimatePrior, Y, GroundStations, W_E, numObservingGroundStations);
         } else {
@@ -627,9 +640,26 @@ int main(){
     PyObject *numpy_module = PyImport_ImportModule("numpy"); // import numpy
     PyObject *cvxpy_module = PyImport_ImportModule("cvxpy"); // import cvxpy
     PyObject* pModule = PyImport_ImportModule("gfoldSolver"); // import custom Python module
+
+    if (!numpy_module || !cvxpy_module || !pModule) {
+        PyErr_Print();
+        throw std::runtime_error("Import failure");
+    }
+
     PyObject* pFunc = PyObject_GetAttrString(pModule, "solveGfoldOptim"); // import function within Python module
+
+    if (!pFunc || !PyCallable_Check(pFunc)) {
+        PyErr_Print();
+        throw std::runtime_error("Function error");
+    }
+
     PyObject* pArgs = PyTuple_Pack(1, pyList); // pack passed arguments
     PyObject* returnedList = PyObject_CallObject(pFunc, pArgs); // execute Python code and receive result
+
+    if (!returnedList || !PyList_Check(returnedList)) {
+        PyErr_Print();
+        throw std::runtime_error("Bad return value");
+    }
 
     // Convert returned PyObject* to a std::vector<float>
     Py_ssize_t size = PyList_Size(returnedList);
@@ -646,6 +676,8 @@ int main(){
     Py_DECREF(pFunc);
     Py_DECREF(pyList);
     Py_DECREF(pModule);
+    Py_DECREF(numpy_module);
+    Py_DECREF(cvxpy_module);
 
     Py_Finalize();
     // End of G-FOLD optimization
